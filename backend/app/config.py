@@ -31,7 +31,7 @@ class Config:
     AZURE_OPENAI_ENDPOINT = os.environ.get('AZURE_OPENAI_ENDPOINT', '')
     AZURE_OPENAI_API_KEY = os.environ.get('AZURE_OPENAI_API_KEY', '')
     AZURE_OPENAI_EMBED_DEPLOYMENT = os.environ.get('AZURE_OPENAI_EMBED_DEPLOYMENT', 'text-embedding-3-small')
-    AZURE_OPENAI_CHAT_DEPLOYMENT = os.environ.get('AZURE_OPENAI_CHAT_DEPLOYMENT', 'gpt-4o')
+    AZURE_OPENAI_CHAT_DEPLOYMENT = os.environ.get('AZURE_OPENAI_CHAT_DEPLOYMENT', '')
     AZURE_OPENAI_API_VERSION = os.environ.get('AZURE_OPENAI_API_VERSION', '2024-02-01')
 
     # Neo4j configuration
