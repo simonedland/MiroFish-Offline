@@ -24,11 +24,14 @@ FOR (ep:Episode) REQUIRE ep.uuid IS UNIQUE
 """
 
 # Vector indexes (Neo4j 5.11+)
+# Dimensions: 1536 for Azure OpenAI text-embedding-3-small
+# NOTE: If upgrading from a 768-dim index, run in Neo4j browser first:
+#   DROP INDEX entity_embedding IF EXISTS;
 CREATE_ENTITY_VECTOR_INDEX = """
 CREATE VECTOR INDEX entity_embedding IF NOT EXISTS
 FOR (n:Entity) ON (n.embedding)
 OPTIONS {indexConfig: {
-    `vector.dimensions`: 768,
+    `vector.dimensions`: 1536,
     `vector.similarity_function`: 'cosine'
 }}
 """
