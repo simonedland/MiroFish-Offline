@@ -2,15 +2,21 @@ services:
   mirofish:
     build: .
     # Or use pre-built image (when available):
-    # image: ghcr.io/nikmcfly/mirofish-offline:latest
+    # image: ghcr.io/simonedland/mirofish-offline:latest
     container_name: mirofish-offline
     env_file:
       - .env
     environment:
-      LLM_BASE_URL: http://ollama:11434/v1
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
+      AZURE_OPENAI_EMBED_DEPLOYMENT: ${AZURE_OPENAI_EMBED_DEPLOYMENT}
+      AZURE_OPENAI_CHAT_DEPLOYMENT: ${AZURE_OPENAI_CHAT_DEPLOYMENT}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-02-01}
+      AZURE_OPENAI_BASE_URL: ${AZURE_OPENAI_ENDPOINT}
+      AZURE_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-02-01}
       NEO4J_URI: bolt://neo4j:7687
-      EMBEDDING_BASE_URL: http://ollama:11434
-      OPENAI_API_BASE_URL: http://ollama:11434/v1
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-mirofish}
     ports:
       - "3000:3000"
       - "5001:5001"
@@ -19,9 +25,7 @@ services:
       - ./backend/uploads:/app/backend/uploads
     depends_on:
       neo4j:
-        condition: service_started
-      ollama:
-        condition: service_started
+        condition: service_healthy
 
   neo4j:
     image: neo4j:5.15-community
@@ -45,16 +49,6 @@ services:
       retries: 10
       start_period: 30s
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: mirofish-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-
 volumes:
   neo4j_data:
   neo4j_logs:
-  ollama_data:
