@@ -188,6 +188,8 @@ class OasisProfileGenerator:
             api_version=Config.AZURE_OPENAI_API_VERSION,
         )
         self.model_name = Config.AZURE_OPENAI_CHAT_DEPLOYMENT
+        if not self.model_name:
+            raise ValueError("AZURE_OPENAI_CHAT_DEPLOYMENT not configured")
 
         # GraphStorage for hybrid search enrichment
         self.storage = storage

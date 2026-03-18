@@ -75,6 +75,8 @@ class Config:
             errors.append("AZURE_OPENAI_ENDPOINT not configured")
         if not cls.AZURE_OPENAI_API_KEY:
             errors.append("AZURE_OPENAI_API_KEY not configured")
+        if not cls.AZURE_OPENAI_CHAT_DEPLOYMENT:
+            errors.append("AZURE_OPENAI_CHAT_DEPLOYMENT not configured")
         if not cls.NEO4J_URI:
             errors.append("NEO4J_URI not configured")
         if not cls.NEO4J_PASSWORD:

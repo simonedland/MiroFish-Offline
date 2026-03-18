@@ -1,9 +1,4 @@
-services:
-  ollama:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+# GPU override file — previously used for Ollama GPU acceleration.
+# Ollama has been removed in favour of Azure OpenAI (cloud API).
+# This file is kept as a placeholder; no GPU services are currently defined.
+services: {}
