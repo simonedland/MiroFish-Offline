@@ -54,7 +54,10 @@ class OasisAgentProfile:
     # Source entity information
     source_entity_uuid: Optional[str] = None
     source_entity_type: Optional[str] = None
-    
+
+    # Description-flow group tracking (empty in document flow)
+    group_id: str = ""
+
     created_at: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
     
     def to_reddit_format(self) -> Dict[str, Any]:
@@ -67,6 +70,7 @@ class OasisAgentProfile:
             "persona": self.persona,
             "karma": self.karma,
             "created_at": self.created_at,
+            "group_id": self.group_id,
         }
 
         # Add additional persona information (if available)
@@ -87,10 +91,18 @@ class OasisAgentProfile:
     
     def to_twitter_format(self) -> Dict[str, Any]:
         """Convert to Twitter platform format"""
+        # user_char: complete persona used by OASIS as the agent's LLM system prompt
+        user_char = self.bio or ""
+        if self.persona:
+            user_char = f"{user_char} {self.persona}".strip()
+        user_char = user_char.replace('\n', ' ').replace('\r', ' ')
+
         profile = {
             "user_id": self.user_id,
             "username": self.user_name,  # OASIS library requires field name as username (no underscore)
             "name": self.name,
+            "user_char": user_char,      # OASIS agents_generator.py reads this column
+            "description": self.bio,
             "bio": self.bio,
             "persona": self.persona,
             "friend_count": self.friend_count,
@@ -114,10 +126,10 @@ class OasisAgentProfile:
             profile["interested_topics"] = self.interested_topics
         
         return profile
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to complete dictionary format"""
-        return {
+        d = {
             "user_id": self.user_id,
             "user_name": self.user_name,
             "name": self.name,
@@ -137,6 +149,77 @@ class OasisAgentProfile:
             "source_entity_type": self.source_entity_type,
             "created_at": self.created_at,
         }
+        if self.group_id:
+            d["group_id"] = self.group_id
+        return d
+
+
+# ---------------------------------------------------------------------------
+# Module-level standalone prompt builders (importable without GraphStorage)
+# ---------------------------------------------------------------------------
+
+def build_individual_persona_prompt(
+    entity_name: str,
+    entity_type: str,
+    entity_summary: str,
+    entity_attributes: Dict[str, Any],
+    context: str,
+) -> str:
+    """
+    Build a persona prompt for an individual-type entity.
+
+    Extracted from OasisProfileGenerator._build_individual_persona_prompt so it
+    can be called by DescriptionProfileGenerator without instantiating the full
+    class (which requires GraphStorage).
+    """
+    attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "None"
+    context_str = context[:3000] if context else "No additional context"
+
+    return f"""Generate a detailed social media user persona for the entity, maximizing restoration of existing reality.
+
+Entity Name: {entity_name}
+Entity Type: {entity_type}
+Entity Summary: {entity_summary}
+Entity Attributes: {attrs_str}
+
+Context Information:
+{context_str}
+
+Please generate JSON containing the following fields:
+
+1. bio: Social media bio, 200 characters
+2. persona: Detailed persona description (2000 words of pure text), must include:
+   - Basic information (age, profession, educational background, location)
+   - Personal background (important experiences, event associations, social relationships)
+   - Personality traits (MBTI type, core personality, emotional expression)
+   - Social media behavior (posting frequency, content preferences, interaction style, language characteristics)
+   - Positions and views (attitudes toward topics, content that may provoke/touch emotions)
+   - Unique features (catchphrases, special experiences, personal interests)
+   - Personal memories (important part of persona, introduce this individual's association with events and their existing actions/reactions in events)
+3. age: Age as number (must be integer)
+4. gender: Gender, must be in English: "male" or "female"
+5. mbti: MBTI type (e.g., INTJ, ENFP)
+6. country: Country (use English, e.g., "US")
+7. profession: Profession
+8. interested_topics: Array of interested topics
+
+Important:
+- All field values must be strings or numbers, do not use newlines
+- persona must be a coherent text description
+- Use English
+- Content must be consistent with entity information
+- age must be a valid integer, gender must be "male" or "female"
+"""
+
+
+def _get_profile_system_prompt() -> str:
+    """Return the system prompt used for persona generation LLM calls."""
+    return (
+        "You are an expert in generating social media user profiles. "
+        "Generate detailed, realistic personas for opinion simulation that maximize "
+        "restoration of existing reality. Must return valid JSON format with all string "
+        "values containing no unescaped newlines. Use English."
+    )
 
 
 class OasisProfileGenerator:
@@ -609,8 +692,7 @@ class OasisProfileGenerator:
     
     def _get_system_prompt(self, is_individual: bool) -> str:
         """Get system prompt"""
-        base_prompt = "You are an expert in generating social media user profiles. Generate detailed, realistic personas for opinion simulation that maximize restoration of existing reality. Must return valid JSON format with all string values containing no unescaped newlines. Use English."
-        return base_prompt
+        return _get_profile_system_prompt()
     
     def _build_individual_persona_prompt(
         self,
@@ -620,46 +702,14 @@ class OasisProfileGenerator:
         entity_attributes: Dict[str, Any],
         context: str
     ) -> str:
-        """Build detailed persona prompt for individual entities"""
-
-        attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "None"
-        context_str = context[:3000] if context else "No additional context"
-
-        return f"""Generate a detailed social media user persona for the entity, maximizing restoration of existing reality.
-
-Entity Name: {entity_name}
-Entity Type: {entity_type}
-Entity Summary: {entity_summary}
-Entity Attributes: {attrs_str}
-
-Context Information:
-{context_str}
-
-Please generate JSON containing the following fields:
-
-1. bio: Social media bio, 200 characters
-2. persona: Detailed persona description (2000 words of pure text), must include:
-   - Basic information (age, profession, educational background, location)
-   - Personal background (important experiences, event associations, social relationships)
-   - Personality traits (MBTI type, core personality, emotional expression)
-   - Social media behavior (posting frequency, content preferences, interaction style, language characteristics)
-   - Positions and views (attitudes toward topics, content that may provoke/touch emotions)
-   - Unique features (catchphrases, special experiences, personal interests)
-   - Personal memories (important part of persona, introduce this individual's association with events and their existing actions/reactions in events)
-3. age: Age as number (must be integer)
-4. gender: Gender, must be in English: "male" or "female"
-5. mbti: MBTI type (e.g., INTJ, ENFP)
-6. country: Country (use English, e.g., "US")
-7. profession: Profession
-8. interested_topics: Array of interested topics
-
-Important:
-- All field values must be strings or numbers, do not use newlines
-- persona must be a coherent text description
-- Use English
-- Content must be consistent with entity information
-- age must be a valid integer, gender must be "male" or "female"
-"""
+        """Build detailed persona prompt for individual entities."""
+        return build_individual_persona_prompt(
+            entity_name=entity_name,
+            entity_type=entity_type,
+            entity_summary=entity_summary,
+            entity_attributes=entity_attributes,
+            context=context,
+        )
 
     def _build_group_persona_prompt(
         self,

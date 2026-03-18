@@ -54,6 +54,7 @@ class AgentActivityConfig:
     entity_uuid: str
     entity_name: str
     entity_type: str
+    group_id: str = ""  # populated in description flow; empty in document flow
 
     # Activity configuration (0.0-1.0)
     activity_level: float = 0.5  # Overall activity level
@@ -85,8 +86,11 @@ class TimeSimulationConfig:
     # Total simulation time (simulation hours)
     total_simulation_hours: int = 72  # Default 72 hours (3 days)
 
-    # Time represented per round (simulation minutes) - default 60 minutes (1 hour), speed up time
-    minutes_per_round: int = 60
+    # Time represented per round (simulation minutes) - 1 = one real minute per round
+    minutes_per_round: int = 1
+
+    # Hour of day (0-23) at which the simulation starts (so round 0 begins here)
+    simulation_start_hour: int = 9
 
     # Range of agents activated per hour
     agents_per_hour_min: int = 5
@@ -552,7 +556,7 @@ Please generate time configuration JSON.
 Example:
 {{
     "total_simulation_hours": 72,
-    "minutes_per_round": 60,
+    "minutes_per_round": 1,
     "agents_per_hour_min": 5,
     "agents_per_hour_max": 50,
     "peak_hours": [19, 20, 21, 22],
@@ -564,7 +568,7 @@ Example:
 
 Field description:
 - total_simulation_hours (int): Total simulation time, 24-168 hours, short for breaking news, long for ongoing topics
-- minutes_per_round (int): Time per round, 30-120 minutes, recommend 60 minutes
+- minutes_per_round (int): Time per round — use 1440 (= 1 full day) to compress simulation time
 - agents_per_hour_min (int): Minimum agents activated per hour (range: 1-{max_agents_allowed})
 - agents_per_hour_max (int): Maximum agents activated per hour (range: 1-{max_agents_allowed})
 - peak_hours (int array): Peak hours, adjust based on event participants
@@ -585,14 +589,15 @@ Field description:
         """Get default time configuration (Chinese work schedule)"""
         return {
             "total_simulation_hours": 72,
-            "minutes_per_round": 60,  # 1 hour per round, speed up time
+            "minutes_per_round": 1,
+            "simulation_start_hour": 9,
             "agents_per_hour_min": max(1, num_entities // 15),
             "agents_per_hour_max": max(5, num_entities // 5),
             "peak_hours": [19, 20, 21, 22],
             "off_peak_hours": [0, 1, 2, 3, 4, 5],
             "morning_hours": [6, 7, 8],
             "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-            "reasoning": "Using default Chinese work schedule configuration (1 hour per round)"
+            "reasoning": "Using default work schedule configuration (1 minute per round, starting at 9am)"
         }
 
     def _parse_time_config(self, result: Dict[str, Any], num_entities: int) -> TimeSimulationConfig:
@@ -617,7 +622,8 @@ Field description:
 
         return TimeSimulationConfig(
             total_simulation_hours=result.get("total_simulation_hours", 72),
-            minutes_per_round=result.get("minutes_per_round", 60),  # Default 1 hour per round
+            minutes_per_round=result.get("minutes_per_round", 1),
+            simulation_start_hour=result.get("simulation_start_hour", 9),
             agents_per_hour_min=agents_per_hour_min,
             agents_per_hour_max=agents_per_hour_max,
             peak_hours=result.get("peak_hours", [19, 20, 21, 22]),

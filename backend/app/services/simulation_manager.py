@@ -73,7 +73,13 @@ class SimulationState:
     
     # Error message
     error: Optional[str] = None
-    
+
+    # Description-based flow fields (sentinel values for document flow)
+    scenario_definition: Optional[Dict[str, Any]] = None  # parsed ScenarioDefinition dict
+    total_agents: int = 0  # set from ScenarioDefinition.total_agents; 0 in document flow
+    config_batch_current: int = 0  # current config-gen batch (description flow)
+    config_batch_total: int = 0    # total config-gen batches (description flow)
+
     def to_dict(self) -> Dict[str, Any]:
         """Complete status dict (internal use)"""
         return {
@@ -94,8 +100,12 @@ class SimulationState:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "error": self.error,
+            "total_agents": self.total_agents,
+            "scenario_definition": self.scenario_definition,
+            "config_batch_current": self.config_batch_current,
+            "config_batch_total": self.config_batch_total,
         }
-    
+
     def to_simple_dict(self) -> Dict[str, Any]:
         """Simplified status dict (API return use)"""
         return {
@@ -108,6 +118,9 @@ class SimulationState:
             "entity_types": self.entity_types,
             "config_generated": self.config_generated,
             "error": self.error,
+            "total_agents": self.total_agents,
+            "config_batch_current": self.config_batch_current,
+            "config_batch_total": self.config_batch_total,
         }
 
 
@@ -185,6 +198,10 @@ class SimulationManager:
             created_at=data.get("created_at", datetime.now().isoformat()),
             updated_at=data.get("updated_at", datetime.now().isoformat()),
             error=data.get("error"),
+            total_agents=data.get("total_agents", 0),
+            scenario_definition=data.get("scenario_definition"),
+            config_batch_current=data.get("config_batch_current", 0),
+            config_batch_total=data.get("config_batch_total", 0),
         )
         
         self._simulations[simulation_id] = state
@@ -458,6 +475,187 @@ class SimulationManager:
             self._save_simulation_state(state)
             raise
     
+    # ------------------------------------------------------------------
+    # Description-based flow
+    # ------------------------------------------------------------------
+
+    def create_from_description(
+        self,
+        description: str,
+        enable_twitter: bool = True,
+        enable_reddit: bool = True,
+    ) -> str:
+        """
+        Create a simulation from a free-form scenario description.
+
+        This method is non-blocking: it creates the simulation record, fires a
+        background thread to do the heavy work, and immediately returns the
+        simulation_id.  The caller should poll GET /api/simulation/<id> and
+        watch for status PREPARING → READY (or FAILED).
+
+        Args:
+            description: Free-form scenario description text.
+            enable_twitter: Whether to enable the Twitter platform.
+            enable_reddit:  Whether to enable the Reddit platform.
+
+        Returns:
+            simulation_id string.
+        """
+        import uuid
+        import threading
+
+        simulation_id = f"sim_{uuid.uuid4().hex[:12]}"
+
+        state = SimulationState(
+            simulation_id=simulation_id,
+            project_id="scenario_flow",
+            graph_id="",
+            enable_twitter=enable_twitter,
+            enable_reddit=enable_reddit,
+            status=SimulationStatus.PREPARING,
+        )
+        self._save_simulation_state(state)
+        logger.info(f"Created description-based simulation: {simulation_id}")
+
+        thread = threading.Thread(
+            target=self._prepare_from_description_async,
+            args=(simulation_id, description, enable_twitter, enable_reddit),
+            daemon=True,
+        )
+        thread.start()
+
+        return simulation_id
+
+    def _prepare_from_description_async(
+        self,
+        simulation_id: str,
+        description: str,
+        enable_twitter: bool,
+        enable_reddit: bool,
+    ) -> None:
+        """
+        Background thread: parse description → generate profiles → generate config.
+
+        Updates SimulationState status at each milestone so the frontend can
+        track progress via GET /api/simulation/<id>.
+        """
+        from .scenario_parser import ScenarioParser
+        from .description_profile_generator import DescriptionProfileGenerator
+        from .description_config_generator import DescriptionConfigGenerator
+
+        state = self._load_simulation_state(simulation_id)
+
+        try:
+            sim_dir = self._get_simulation_dir(simulation_id)
+
+            # ---- Phase 1: Parse description ----
+            logger.info(f"[{simulation_id}] Parsing scenario description...")
+            parser = ScenarioParser()
+            scenario = parser.parse(description)
+
+            state.total_agents = scenario.total_agents
+            state.scenario_definition = scenario.to_dict()
+            self._save_simulation_state(state)
+
+            # Save scenario_definition.json
+            scenario_def_path = os.path.join(sim_dir, "scenario_definition.json")
+            with open(scenario_def_path, 'w', encoding='utf-8') as f:
+                f.write(scenario.to_json())
+
+            logger.info(
+                f"[{simulation_id}] Scenario parsed: '{scenario.title}', "
+                f"{scenario.total_agents} agents"
+            )
+
+            # ---- Phase 2: Generate profiles ----
+            logger.info(f"[{simulation_id}] Generating {scenario.total_agents} agent profiles...")
+
+            # Determine realtime output path
+            if enable_reddit:
+                realtime_path = os.path.join(sim_dir, "reddit_profiles.json")
+                realtime_platform = "reddit"
+            else:
+                realtime_path = os.path.join(sim_dir, "twitter_profiles.csv")
+                realtime_platform = "twitter"
+
+            profile_generator = DescriptionProfileGenerator()
+
+            def profile_progress(current, total, msg):
+                state.profiles_count = current
+                self._save_simulation_state(state)
+
+            profiles = profile_generator.generate(
+                scenario=scenario,
+                progress_callback=profile_progress,
+                realtime_output_path=realtime_path,
+                output_platform=realtime_platform,
+            )
+
+            state.profiles_count = len(profiles)
+            self._save_simulation_state(state)
+
+            # Persist profiles in both formats if both platforms enabled
+            if enable_reddit:
+                reddit_path = os.path.join(sim_dir, "reddit_profiles.json")
+                import json as _json
+                reddit_data = [p.to_reddit_format() for p in profiles]
+                with open(reddit_path, 'w', encoding='utf-8') as f:
+                    _json.dump(reddit_data, f, ensure_ascii=False, indent=2)
+
+            if enable_twitter:
+                twitter_path = os.path.join(sim_dir, "twitter_profiles.csv")
+                import csv as _csv
+                twitter_data = [p.to_twitter_format() for p in profiles]
+                if twitter_data:
+                    with open(twitter_path, 'w', encoding='utf-8', newline='') as f:
+                        writer = _csv.DictWriter(f, fieldnames=list(twitter_data[0].keys()))
+                        writer.writeheader()
+                        writer.writerows(twitter_data)
+
+            logger.info(f"[{simulation_id}] Generated {len(profiles)} profiles")
+
+            # ---- Phase 3: Generate simulation config ----
+            logger.info(f"[{simulation_id}] Generating simulation config...")
+            config_gen = DescriptionConfigGenerator()
+
+            def config_progress(current_batch: int, total_batches: int) -> None:
+                state.config_batch_current = current_batch
+                state.config_batch_total = total_batches
+                self._save_simulation_state(state)
+
+            sim_params = config_gen.generate(
+                simulation_id=simulation_id,
+                scenario=scenario,
+                profiles=profiles,
+                enable_twitter=enable_twitter,
+                enable_reddit=enable_reddit,
+                progress_callback=config_progress,
+            )
+
+            config_path = os.path.join(sim_dir, "simulation_config.json")
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.write(sim_params.to_json())
+
+            state.config_generated = True
+            state.config_reasoning = sim_params.generation_reasoning
+
+            # ---- Done ----
+            state.status = SimulationStatus.READY
+            self._save_simulation_state(state)
+
+            logger.info(
+                f"[{simulation_id}] Description-based preparation complete: "
+                f"profiles={len(profiles)}, agents={scenario.total_agents}"
+            )
+
+        except Exception as exc:
+            import traceback as _tb
+            logger.error(f"[{simulation_id}] Description-based preparation failed: {exc}")
+            logger.error(_tb.format_exc())
+            state.status = SimulationStatus.FAILED
+            state.error = str(exc)
+            self._save_simulation_state(state)
+
     def get_simulation(self, simulation_id: str) -> Optional[SimulationState]:
         """Get simulation state"""
         return self._load_simulation_state(simulation_id)
@@ -480,6 +678,14 @@ class SimulationManager:
         
         return simulations
     
+    def delete_simulation(self, simulation_id: str) -> None:
+        """Permanently delete a simulation directory and remove from in-memory cache."""
+        sim_dir = self._get_simulation_dir(simulation_id)
+        if not os.path.exists(sim_dir):
+            raise ValueError(f"Simulation does not exist: {simulation_id}")
+        shutil.rmtree(sim_dir)
+        self._simulations.pop(simulation_id, None)
+
     def get_profiles(self, simulation_id: str, platform: str = "reddit") -> List[Dict[str, Any]]:
         """Get Agent Profiles for simulation"""
         state = self._load_simulation_state(simulation_id)

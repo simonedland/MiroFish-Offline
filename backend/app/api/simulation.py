@@ -806,6 +806,20 @@ def list_simulations():
         }), 500
 
 
+@simulation_bp.route('/<simulation_id>', methods=['DELETE'])
+def delete_simulation(simulation_id: str):
+    """Permanently delete a simulation and all its files."""
+    try:
+        manager = SimulationManager()
+        manager.delete_simulation(simulation_id)
+        return jsonify({"success": True, "simulation_id": simulation_id})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 404
+    except Exception as e:
+        logger.error(f"Failed to delete simulation {simulation_id}: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 def _get_report_id_for_simulation(simulation_id: str) -> str:
     """
     Get simulation Corresponding latest report_id

@@ -37,11 +37,13 @@
     <main class="content-area">
       <!-- Left Panel: Graph -->
       <div class="panel-wrapper left" :style="leftPanelStyle">
-        <GraphPanel 
+        <GraphPanel
           :graphData="graphData"
           :loading="graphLoading"
           :currentPhase="3"
           :isSimulating="isSimulating"
+          :clustered="isDescriptionFlow"
+          :recentActions="latestActions"
           @refresh="refreshGraph"
           @toggle-maximize="toggleMaximize('graph')"
         />
@@ -72,7 +74,8 @@ import { useRoute, useRouter } from 'vue-router'
 import GraphPanel from '../components/GraphPanel.vue'
 import Step3Simulation from '../components/Step3Simulation.vue'
 import { getProject, getGraphData } from '../api/graph'
-import { getSimulation, getSimulationConfig, stopSimulation, closeSimulationEnv, getEnvStatus } from '../api/simulation'
+import { getSimulation, getSimulationConfig, getSimulationProfiles, getSimulationActions, getRunStatusDetail, stopSimulation, closeSimulationEnv, getEnvStatus } from '../api/simulation'
+import { getSimulationGroups } from '../api/scenario'
 
 const route = useRoute()
 const router = useRouter()
@@ -93,6 +96,11 @@ const minutesPerRound = ref(30) // Default 30 minutes per round
 const projectData = ref(null)
 const graphData = ref(null)
 const graphLoading = ref(false)
+const isDescriptionFlow = ref(false)
+const agentNameMap = ref({})    // username.lower → user_id (built by buildAgentGraph)
+const latestActions = ref([])   // [{srcId, tgtId?}] — fed to GraphPanel for animation
+let seenActionCount = 0
+let actionPollTimer = null
 const systemLogs = ref([])
 const currentStatus = ref('processing') // processing | completed | error
 
@@ -147,9 +155,6 @@ const toggleMaximize = (target) => {
 const handleGoBack = async () => {
   // Close running simulation before returning to Step 2
   addLog('Returning to Step 2, closing simulation...')
-
-  // Stop polling
-  stopGraphRefresh()
 
   try {
     // First try gracefully closing the simulation environment
@@ -219,8 +224,14 @@ const loadSimulationData = async () => {
         addLog(`Failed to get time config, using default: ${minutesPerRound.value} min/round`)
       }
 
-      // Get project information
-      if (simData.project_id) {
+      // For description-flow: build agent relationship graph from profiles + groups
+      if (simData.project_id === 'scenario_flow') {
+        isDescriptionFlow.value = true
+        await buildAgentGraph()
+      }
+
+      // Get project information (skip for description-flow simulations)
+      if (simData.project_id && simData.project_id !== 'scenario_flow') {
         const projRes = await getProject(simData.project_id)
         if (projRes.success && projRes.data) {
           projectData.value = projRes.data
@@ -263,34 +274,196 @@ const loadGraph = async (graphId) => {
 }
 
 const refreshGraph = () => {
-  if (projectData.value?.graph_id) {
+  if (isDescriptionFlow.value) {
+    buildAgentGraph()
+  } else if (projectData.value?.graph_id) {
     loadGraph(projectData.value.graph_id)
   }
 }
 
-// --- Auto Refresh Logic ---
-let graphRefreshTimer = null
+// Build a D3-compatible agent interaction graph for description-flow simulations.
+// Nodes  = agents (colored by group via labels[])
+// Edges  = group-level interactions + actual reply/follow actions from the run log
+const buildAgentGraph = async () => {
+  graphLoading.value = true
+  try {
+    const [profilesRes, groupsRes, actionsRes] = await Promise.allSettled([
+      getSimulationProfiles(currentSimulationId.value, 'reddit'),
+      getSimulationGroups(currentSimulationId.value),
+      getSimulationActions(currentSimulationId.value, { limit: 500 }),
+    ])
 
-const startGraphRefresh = () => {
-  if (graphRefreshTimer) return
-  addLog('Graph auto-refresh started (30s)')
-  // Refresh immediately, then every 30 seconds
-  graphRefreshTimer = setInterval(refreshGraph, 30000)
+    const profiles = profilesRes.status === 'fulfilled' ? (profilesRes.value.data?.profiles || []) : []
+    const groups   = groupsRes.status   === 'fulfilled' ? (groupsRes.value.data?.groups || []) : []
+    const actions  = actionsRes.status  === 'fulfilled' ? (actionsRes.value.data?.actions || []) : []
+
+    if (profiles.length === 0) return
+
+    // Build group lookup for node enrichment
+    const groupByName = {}
+    groups.forEach(g => { groupByName[g.name] = g })
+
+    // Build node list — one node per agent, with full profile + group data for detail panel
+    const nodes = profiles.map(p => {
+      const groupId = p.group_id || 'agent'
+      const group   = groupByName[groupId] || null
+      return {
+        uuid:   `agent_${p.user_id}`,
+        name:   p.username || p.user_name || p.name || `Agent ${p.user_id}`,
+        labels: [groupId],
+        // Agent detail fields
+        username:    p.username || p.user_name || '',
+        bio:         p.bio || '',
+        persona:     p.persona || '',
+        age:         p.age || null,
+        gender:      p.gender || null,
+        mbti:        p.mbti || null,
+        country:     p.country || null,
+        profession:  p.profession || null,
+        interested_topics: p.interested_topics || [],
+        karma:       p.karma || null,
+        group_id:    groupId,
+        // Embedded group definition for schedule/behavior info
+        group: group ? {
+          label:                group.label,
+          behavior_description: group.behavior_description,
+          communication_style:  group.communication_style,
+          stance:               group.stance,
+          sentiment_bias:       group.sentiment_bias,
+          activity_level:       group.activity_level,
+          active_hours_hint:    group.active_hours_hint,
+          interacts_with:       group.interacts_with || [],
+        } : null,
+      }
+    })
+
+    // Lookup maps
+    const agentByName = {}
+    profiles.forEach(p => {
+      const n = (p.username || p.user_name || '').toLowerCase()
+      if (n) agentByName[n] = p.user_id
+    })
+
+    const groupAgents = {}
+    profiles.forEach(p => {
+      const g = p.group_id || 'unknown'
+      if (!groupAgents[g]) groupAgents[g] = []
+      groupAgents[g].push(p.user_id)
+    })
+
+    const edgeSet = new Set()
+    const edges   = []
+
+    const addEdge = (srcId, tgtId, type) => {
+      if (srcId === tgtId) return
+      const key = `${srcId}_${tgtId}_${type}`
+      if (edgeSet.has(key)) return
+      edgeSet.add(key)
+      edges.push({
+        source_node_uuid: `agent_${srcId}`,
+        target_node_uuid: `agent_${tgtId}`,
+        relationship_type: type,
+        name: type,
+      })
+    }
+
+    // 1. Group-defined interactions
+    groups.forEach(group => {
+      const srcs = groupAgents[group.name] || []
+      if (!srcs.length) return
+
+      // Dense intra-group mesh — every agent connects to several neighbours
+      // (makes same-group nodes cluster tightly)
+      const intraCount = Math.min(srcs.length, group.communication_style === 'coordinate_within_group' ? srcs.length : 3)
+      for (let i = 0; i < srcs.length; i++) {
+        for (let j = 1; j <= intraCount; j++) {
+          addEdge(srcs[i], srcs[(i + j) % srcs.length],
+            group.communication_style === 'coordinate_within_group' ? 'COORDINATES' : 'KNOWS')
+        }
+      }
+
+      // Cross-group targeting — sparse, labelled by relationship
+      ;(group.interacts_with || []).forEach(targetName => {
+        const tgts = groupAgents[targetName] || []
+        if (!tgts.length) return
+        const label = `${group.name} → ${targetName}`
+        const n = Math.min(srcs.length, 5)
+        for (let i = 0; i < n; i++) {
+          addEdge(srcs[i], tgts[i % tgts.length], label)
+        }
+      })
+    })
+
+    // 2. Actual actions from the simulation run
+    actions.forEach(a => {
+      const srcId = a.agent_id
+      const args  = a.action_args || {}
+      const type  = (a.action_type || '').toUpperCase()
+
+      // FOLLOW / LIKE actions carry user_id or target_id
+      const targetId = args.user_id ?? args.target_id
+      if (targetId != null && targetId !== srcId) {
+        addEdge(srcId, targetId, type === 'FOLLOW' ? 'FOLLOWS' : 'INTERACTS')
+        return
+      }
+
+      // COMMENT / LIKE_POST: target is the post author
+      const authorName = (args.post_author_name || args.comment_author_name || args.original_author_name || '').toLowerCase()
+      if (authorName) {
+        const tgtId = agentByName[authorName]
+        if (tgtId != null) addEdge(srcId, tgtId, 'REPLIES')
+      }
+    })
+
+    graphData.value = { nodes, edges }
+    agentNameMap.value = agentByName   // save for action processing
+    addLog(`Agent graph: ${nodes.length} nodes, ${edges.length} edges`)
+  } catch (err) {
+    addLog(`Agent graph failed: ${err.message}`)
+  } finally {
+    graphLoading.value = false
+  }
 }
 
-const stopGraphRefresh = () => {
-  if (graphRefreshTimer) {
-    clearInterval(graphRefreshTimer)
-    graphRefreshTimer = null
-    addLog('Graph auto-refresh stopped')
-  }
+// Process new simulation actions into animation events for GraphPanel
+const processNewActions = (actions) => {
+  if (actions.length <= seenActionCount) return
+  const fresh = actions.slice(seenActionCount)
+  seenActionCount = actions.length
+  latestActions.value = fresh.map(a => {
+    const srcId = `agent_${a.agent_id}`
+    const args = a.action_args || {}
+    const authorName = (
+      args.post_author_name || args.comment_author_name || args.original_author_name || ''
+    ).toLowerCase()
+    const tgtUserId = agentNameMap.value[authorName]
+    const tgtId = tgtUserId != null ? `agent_${tgtUserId}` : null
+    return { srcId, tgtId, type: (a.action_type || '').toUpperCase() }
+  }).filter(a => a.srcId)
+}
+
+const startActionPoll = () => {
+  if (actionPollTimer) return
+  actionPollTimer = setInterval(async () => {
+    try {
+      const res = await getRunStatusDetail(currentSimulationId.value)
+      processNewActions(res.data?.all_actions || [])
+    } catch (_) {}
+  }, 4000)
+}
+
+const stopActionPoll = () => {
+  if (actionPollTimer) { clearInterval(actionPollTimer); actionPollTimer = null }
 }
 
 watch(isSimulating, (newValue) => {
   if (newValue) {
-    startGraphRefresh()
+    if (isDescriptionFlow.value) {
+      startActionPoll()   // description-flow: animate actions, don't rebuild graph
+    }
+    // document-flow: graph only refreshes on manual Refresh button click
   } else {
-    stopGraphRefresh()
+    stopActionPoll()
   }
 }, { immediate: true })
 
@@ -306,7 +479,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  stopGraphRefresh()
+  stopActionPoll()
 })
 </script>
 
@@ -443,5 +616,7 @@ onUnmounted(() => {
 .panel-wrapper.left {
   border-right: 1px solid #EAEAEA;
 }
+
+
 </style>
 

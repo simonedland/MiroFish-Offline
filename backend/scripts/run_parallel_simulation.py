@@ -1008,6 +1008,7 @@ def create_model(config: Dict[str, Any]):
     os.environ["AZURE_OPENAI_API_KEY"] = azure_api_key
     os.environ["AZURE_OPENAI_BASE_URL"] = azure_endpoint
     os.environ["AZURE_API_VERSION"] = azure_api_version
+    os.environ["AZURE_DEPLOYMENT_NAME"] = llm_model
 
     print(f"LLM configuration: model={llm_model}, endpoint={azure_endpoint[:40] if azure_endpoint else 'default'}...")
 
@@ -1026,31 +1027,39 @@ def get_active_agents_for_round(
     """Decide which Agents to activate this round based on time and configuration"""
     time_config = config.get("time_config", {})
     agent_configs = config.get("agent_configs", [])
-    
+
     base_min = time_config.get("agents_per_hour_min", 5)
     base_max = time_config.get("agents_per_hour_max", 20)
-    
+
+    # When minutes_per_round >= 1440, each round covers a full day so the
+    # simulated_hour formula always resolves to 0 (midnight). Skip hour-based
+    # filtering and use normal-hour activity in that case.
+    minutes_per_round = time_config.get("minutes_per_round", 1)
+    full_day_round = minutes_per_round >= 1440
+
     peak_hours = time_config.get("peak_hours", [9, 10, 11, 14, 15, 20, 21, 22])
     off_peak_hours = time_config.get("off_peak_hours", [0, 1, 2, 3, 4, 5])
-    
-    if current_hour in peak_hours:
+
+    if full_day_round:
+        multiplier = 1.0
+    elif current_hour in peak_hours:
         multiplier = time_config.get("peak_activity_multiplier", 1.5)
     elif current_hour in off_peak_hours:
         multiplier = time_config.get("off_peak_activity_multiplier", 0.3)
     else:
         multiplier = 1.0
-    
+
     target_count = int(random.uniform(base_min, base_max) * multiplier)
-    
+
     candidates = []
     for cfg in agent_configs:
         agent_id = cfg.get("agent_id", 0)
         active_hours = cfg.get("active_hours", list(range(8, 23)))
         activity_level = cfg.get("activity_level", 0.5)
-        
-        if current_hour not in active_hours:
+
+        if not full_day_round and current_hour not in active_hours:
             continue
-        
+
         if random.random() < activity_level:
             candidates.append(agent_id)
     
@@ -1192,28 +1201,29 @@ async def run_twitter_simulation(
     # Main simulation loop
     time_config = config.get("time_config", {})
     total_hours = time_config.get("total_simulation_hours", 72)
-    minutes_per_round = time_config.get("minutes_per_round", 30)
+    minutes_per_round = time_config.get("minutes_per_round", 1)
+    simulation_start_hour = time_config.get("simulation_start_hour", 9)
     total_rounds = (total_hours * 60) // minutes_per_round
-    
+
     # If maximum rounds specified, truncate
     if max_rounds is not None and max_rounds > 0:
         original_rounds = total_rounds
         total_rounds = min(total_rounds, max_rounds)
         if total_rounds < original_rounds:
             log_info(f"Rounds truncated: {original_rounds} -> {total_rounds} (max_rounds={max_rounds})")
-    
+
     start_time = datetime.now()
-    
+
     for round_num in range(total_rounds):
         # Check if received exit signal
         if _shutdown_event and _shutdown_event.is_set():
             if main_logger:
                 main_logger.info(f"Received exit signal，at round {round_num + 1} stop simulation")
             break
-        
+
         simulated_minutes = round_num * minutes_per_round
-        simulated_hour = (simulated_minutes // 60) % 24
-        simulated_day = simulated_minutes // (60 * 24) + 1
+        simulated_hour = (simulation_start_hour + simulated_minutes // 60) % 24
+        simulated_day = (simulation_start_hour * 60 + simulated_minutes) // (60 * 24) + 1
         
         active_agents = get_active_agents_for_round(
             result.env, config, simulated_hour, round_num
@@ -1390,28 +1400,29 @@ async def run_reddit_simulation(
     # Main simulation loop
     time_config = config.get("time_config", {})
     total_hours = time_config.get("total_simulation_hours", 72)
-    minutes_per_round = time_config.get("minutes_per_round", 30)
+    minutes_per_round = time_config.get("minutes_per_round", 1)
+    simulation_start_hour = time_config.get("simulation_start_hour", 9)
     total_rounds = (total_hours * 60) // minutes_per_round
-    
+
     # If maximum rounds specified, truncate
     if max_rounds is not None and max_rounds > 0:
         original_rounds = total_rounds
         total_rounds = min(total_rounds, max_rounds)
         if total_rounds < original_rounds:
             log_info(f"Rounds truncated: {original_rounds} -> {total_rounds} (max_rounds={max_rounds})")
-    
+
     start_time = datetime.now()
-    
+
     for round_num in range(total_rounds):
         # Check if received exit signal
         if _shutdown_event and _shutdown_event.is_set():
             if main_logger:
                 main_logger.info(f"Received exit signal，at round {round_num + 1} stop simulation")
             break
-        
+
         simulated_minutes = round_num * minutes_per_round
-        simulated_hour = (simulated_minutes // 60) % 24
-        simulated_day = simulated_minutes // (60 * 24) + 1
+        simulated_hour = (simulation_start_hour + simulated_minutes // 60) % 24
+        simulated_day = (simulation_start_hour * 60 + simulated_minutes) // (60 * 24) + 1
         
         active_agents = get_active_agents_for_round(
             result.env, config, simulated_hour, round_num
@@ -1529,7 +1540,7 @@ async def main():
     
     time_config = config.get("time_config", {})
     total_hours = time_config.get('total_simulation_hours', 72)
-    minutes_per_round = time_config.get('minutes_per_round', 30)
+    minutes_per_round = time_config.get('minutes_per_round', 1)
     config_total_rounds = (total_hours * 60) // minutes_per_round
     
     log_manager.info(f"Simulation parameters:")

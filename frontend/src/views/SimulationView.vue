@@ -244,8 +244,8 @@ const loadSimulationData = async () => {
     if (simRes.success && simRes.data) {
       const simData = simRes.data
 
-      // Get project info
-      if (simData.project_id) {
+      // Get project info (skip for description-flow simulations)
+      if (simData.project_id && simData.project_id !== 'scenario_flow') {
         const projRes = await getProject(simData.project_id)
         if (projRes.success && projRes.data) {
           projectData.value = projRes.data

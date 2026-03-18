@@ -392,11 +392,12 @@ const doStartSimulation = async () => {
   emit('update-status', 'processing')
 
   try {
+    const hasGraph = !!(props.graphData && props.projectData?.graph_id)
     const params = {
       simulation_id: props.simulationId,
       platform: 'parallel',
       force: true,  // Force restart
-      enable_graph_memory_update: true  // Enable dynamic graph update
+      enable_graph_memory_update: hasGraph  // Only enable if graph exists
     }
 
     if (props.maxRounds) {
@@ -404,7 +405,9 @@ const doStartSimulation = async () => {
       addLog(`Set max simulation rounds: ${props.maxRounds}`)
     }
 
-    addLog('Dynamic graph update mode enabled')
+    if (hasGraph) {
+      addLog('Dynamic graph update mode enabled')
+    }
 
     const res = await startSimulation(params)
 

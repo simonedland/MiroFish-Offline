@@ -60,45 +60,134 @@
           
           <!-- Node Details -->
           <div v-if="selectedItem.type === 'node'" class="detail-content">
-            <div class="detail-row">
-              <span class="detail-label">Name:</span>
-              <span class="detail-value">{{ selectedItem.data.name }}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">UUID:</span>
-              <span class="detail-value uuid-text">{{ selectedItem.data.uuid }}</span>
-            </div>
-            <div class="detail-row" v-if="selectedItem.data.created_at">
-              <span class="detail-label">Created:</span>
-              <span class="detail-value">{{ formatDateTime(selectedItem.data.created_at) }}</span>
-            </div>
-            
-            <!-- Properties -->
-            <div class="detail-section" v-if="selectedItem.data.attributes && Object.keys(selectedItem.data.attributes).length > 0">
-              <div class="section-title">Properties:</div>
-              <div class="properties-list">
-                <div v-for="(value, key) in selectedItem.data.attributes" :key="key" class="property-item">
-                  <span class="property-key">{{ key }}:</span>
-                  <span class="property-value">{{ value || 'None' }}</span>
+
+            <!-- Agent card (description-flow: has bio/persona/group) -->
+            <template v-if="selectedItem.data.bio || selectedItem.data.persona">
+
+              <!-- Identity row -->
+              <div class="agent-identity">
+                <div class="agent-avatar" :style="{ background: selectedItem.color }">
+                  {{ (selectedItem.data.username || selectedItem.data.name || '?')[0].toUpperCase() }}
+                </div>
+                <div class="agent-identity-text">
+                  <div class="agent-username">@{{ selectedItem.data.username || selectedItem.data.name }}</div>
+                  <div class="agent-fullname">{{ selectedItem.data.name || '' }}</div>
                 </div>
               </div>
-            </div>
-            
-            <!-- Summary -->
-            <div class="detail-section" v-if="selectedItem.data.summary">
-              <div class="section-title">Summary:</div>
-              <div class="summary-text">{{ selectedItem.data.summary }}</div>
-            </div>
-            
-            <!-- Labels -->
-            <div class="detail-section" v-if="selectedItem.data.labels && selectedItem.data.labels.length > 0">
-              <div class="section-title">Labels:</div>
-              <div class="labels-list">
-                <span v-for="label in selectedItem.data.labels" :key="label" class="label-tag">
-                  {{ label }}
-                </span>
+
+              <!-- Bio -->
+              <div v-if="selectedItem.data.bio" class="agent-section">
+                <div class="agent-section-title">Bio</div>
+                <div class="agent-prose">{{ selectedItem.data.bio }}</div>
               </div>
-            </div>
+
+              <!-- Persona -->
+              <div v-if="selectedItem.data.persona" class="agent-section">
+                <div class="agent-section-title">Persona</div>
+                <div class="agent-prose small">{{ selectedItem.data.persona }}</div>
+              </div>
+
+              <!-- Profile facts -->
+              <div class="agent-section">
+                <div class="agent-section-title">Profile</div>
+                <div class="agent-facts-grid">
+                  <span v-if="selectedItem.data.age" class="agent-fact"><span class="fact-k">Age</span><span class="fact-v">{{ selectedItem.data.age }}</span></span>
+                  <span v-if="selectedItem.data.gender" class="agent-fact"><span class="fact-k">Gender</span><span class="fact-v">{{ selectedItem.data.gender }}</span></span>
+                  <span v-if="selectedItem.data.mbti" class="agent-fact"><span class="fact-k">MBTI</span><span class="fact-v">{{ selectedItem.data.mbti }}</span></span>
+                  <span v-if="selectedItem.data.country" class="agent-fact"><span class="fact-k">Country</span><span class="fact-v">{{ selectedItem.data.country }}</span></span>
+                  <span v-if="selectedItem.data.profession" class="agent-fact"><span class="fact-k">Profession</span><span class="fact-v">{{ selectedItem.data.profession }}</span></span>
+                  <span v-if="selectedItem.data.karma" class="agent-fact"><span class="fact-k">Karma</span><span class="fact-v">{{ selectedItem.data.karma }}</span></span>
+                </div>
+                <div v-if="selectedItem.data.interested_topics?.length" class="agent-topics">
+                  <span v-for="t in selectedItem.data.interested_topics" :key="t" class="topic-tag">{{ t }}</span>
+                </div>
+              </div>
+
+              <!-- Group / Behaviour -->
+              <div v-if="selectedItem.data.group" class="agent-section group-section">
+                <div class="agent-section-title">
+                  Group · <span :style="{ color: selectedItem.color }">{{ selectedItem.data.group.label || selectedItem.data.group_id }}</span>
+                </div>
+
+                <div v-if="selectedItem.data.group.behavior_description" class="agent-prose small muted">
+                  {{ selectedItem.data.group.behavior_description }}
+                </div>
+
+                <div class="agent-facts-grid" style="margin-top:8px">
+                  <span class="agent-fact"><span class="fact-k">Style</span><span class="fact-v">{{ selectedItem.data.group.communication_style }}</span></span>
+                  <span class="agent-fact"><span class="fact-k">Stance</span><span class="fact-v">{{ selectedItem.data.group.stance }}</span></span>
+                </div>
+
+                <!-- Activity level bar -->
+                <div class="agent-bar-row">
+                  <span class="bar-label">Activity</span>
+                  <div class="bar-track">
+                    <div class="bar-fill activity" :style="{ width: (selectedItem.data.group.activity_level * 100) + '%' }" />
+                  </div>
+                  <span class="bar-val">{{ Math.round(selectedItem.data.group.activity_level * 100) }}%</span>
+                </div>
+
+                <!-- Sentiment bar (center = 0) -->
+                <div class="agent-bar-row">
+                  <span class="bar-label">Sentiment</span>
+                  <div class="bar-track sentiment-track">
+                    <div class="bar-fill sentiment"
+                      :style="sentimentStyle(selectedItem.data.group.sentiment_bias)" />
+                  </div>
+                  <span class="bar-val">{{ selectedItem.data.group.sentiment_bias > 0 ? '+' : '' }}{{ selectedItem.data.group.sentiment_bias.toFixed(1) }}</span>
+                </div>
+
+                <!-- Schedule -->
+                <div class="agent-bar-row">
+                  <span class="bar-label">Schedule</span>
+                  <span class="schedule-badge">{{ selectedItem.data.group.active_hours_hint }}</span>
+                </div>
+
+                <!-- Targets -->
+                <div v-if="selectedItem.data.group.interacts_with?.length" class="agent-bar-row" style="align-items:flex-start">
+                  <span class="bar-label">Targets</span>
+                  <div style="display:flex;flex-wrap:wrap;gap:4px">
+                    <span v-for="t in selectedItem.data.group.interacts_with" :key="t" class="target-tag">{{ t }}</span>
+                  </div>
+                </div>
+              </div>
+
+            </template>
+
+            <!-- Fallback: document-flow node (knowledge graph entity) -->
+            <template v-else>
+              <div class="detail-row">
+                <span class="detail-label">Name:</span>
+                <span class="detail-value">{{ selectedItem.data.name }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">UUID:</span>
+                <span class="detail-value uuid-text">{{ selectedItem.data.uuid }}</span>
+              </div>
+              <div class="detail-row" v-if="selectedItem.data.created_at">
+                <span class="detail-label">Created:</span>
+                <span class="detail-value">{{ formatDateTime(selectedItem.data.created_at) }}</span>
+              </div>
+              <div class="detail-section" v-if="selectedItem.data.attributes && Object.keys(selectedItem.data.attributes).length > 0">
+                <div class="section-title">Properties:</div>
+                <div class="properties-list">
+                  <div v-for="(value, key) in selectedItem.data.attributes" :key="key" class="property-item">
+                    <span class="property-key">{{ key }}:</span>
+                    <span class="property-value">{{ value || 'None' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="detail-section" v-if="selectedItem.data.summary">
+                <div class="section-title">Summary:</div>
+                <div class="summary-text">{{ selectedItem.data.summary }}</div>
+              </div>
+              <div class="detail-section" v-if="selectedItem.data.labels?.length">
+                <div class="section-title">Labels:</div>
+                <div class="labels-list">
+                  <span v-for="label in selectedItem.data.labels" :key="label" class="label-tag">{{ label }}</span>
+                </div>
+              </div>
+            </template>
           </div>
           
           <!-- Edge Details -->
@@ -243,7 +332,9 @@ const props = defineProps({
   graphData: Object,
   loading: Boolean,
   currentPhase: Number,
-  isSimulating: Boolean
+  isSimulating: Boolean,
+  clustered: { type: Boolean, default: false },       // group-based cluster layout
+  recentActions: { type: Array, default: () => [] },  // [{srcId, tgtId?, type}]
 })
 
 const emit = defineEmits(['refresh', 'toggle-maximize'])
@@ -251,7 +342,7 @@ const emit = defineEmits(['refresh', 'toggle-maximize'])
 const graphContainer = ref(null)
 const graphSvg = ref(null)
 const selectedItem = ref(null)
-const showEdgeLabels = ref(true) // Default show edge labels
+const showEdgeLabels = ref(!props.clustered) // Default off for clustered (large agent graphs)
 const expandedSelfLoops = ref(new Set()) // Expanded self-loop items
 const showSimulationFinishedHint = ref(false) // Simulation finished hint
 const wasSimulating = ref(false) // Track whether was simulating before
@@ -318,12 +409,23 @@ const formatDateTime = (dateStr) => {
 
 const closeDetailPanel = () => {
   selectedItem.value = null
-  expandedSelfLoops.value = new Set() // Reset expand state
+  expandedSelfLoops.value = new Set()
+}
+
+// Returns inline style for the sentiment bar (centred at 50%)
+const sentimentStyle = (bias) => {
+  const pct  = Math.abs(bias) * 50        // 0–50 % wide
+  const left = bias >= 0 ? '50%' : (50 - pct) + '%'
+  const color = bias >= 0 ? '#4ade80' : '#f87171'
+  return { left, width: pct + '%', background: color }
 }
 
 let currentSimulation = null
 let linkLabelsRef = null
 let linkLabelBgRef = null
+let nodeByUuid = {}   // uuid → DOM circle element
+let edgeByPair = {}   // "srcId_tgtId" → DOM path element
+let svgG = null       // main <g> group for animation overlay
 
 const renderGraph = () => {
   if (!graphSvg.value || !props.graphData) return
@@ -468,26 +570,64 @@ const renderGraph = () => {
   entityTypes.value.forEach(t => colorMap[t.name] = t.color)
   const getColor = (type) => colorMap[type] || '#999'
 
-  // Simulation - dynamically adjust node spacing based on edge count
+  // Pre-position nodes near their cluster center so they settle faster
+  if (props.clustered) {
+    const groupNames = [...new Set(nodes.map(n => n.type))]
+    const clusterRadius = Math.min(width, height) * 0.30
+    const _centers = {}
+    groupNames.forEach((g, i) => {
+      const angle = (2 * Math.PI * i) / groupNames.length - Math.PI / 2
+      _centers[g] = {
+        x: width / 2 + clusterRadius * Math.cos(angle),
+        y: height / 2 + clusterRadius * Math.sin(angle),
+      }
+    })
+    nodes.forEach(n => {
+      const c = _centers[n.type]
+      if (c) { n.x = c.x + (Math.random() - 0.5) * 50; n.y = c.y + (Math.random() - 0.5) * 50 }
+    })
+  }
+
   const simulation = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(edges).id(d => d.id).distance(d => {
-      // Dynamically adjust distance based on edge count between this pair of nodes
-      // Base distance 150, add 40 for each additional edge
-      const baseDistance = 150
-      const edgeCount = d.pairTotal || 1
-      return baseDistance + (edgeCount - 1) * 50
+      const base = props.clustered ? 60 : 150
+      return base + ((d.pairTotal || 1) - 1) * 30
     }))
-    .force('charge', d3.forceManyBody().strength(-400))
+    .force('charge', d3.forceManyBody().strength(props.clustered ? -150 : -400))
     .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collide', d3.forceCollide(50))
-    // Add center gravity to cluster independent node groups to center area
-    .force('x', d3.forceX(width / 2).strength(0.04))
-    .force('y', d3.forceY(height / 2).strength(0.04))
+    .force('collide', d3.forceCollide(props.clustered ? 18 : 50))
+
+  if (props.clustered) {
+    // Pull each node toward its group center
+    const groupNames = [...new Set(nodes.map(n => n.type))]
+    const clusterRadius = Math.min(width, height) * 0.30
+    const groupCenters = {}
+    groupNames.forEach((g, i) => {
+      const angle = (2 * Math.PI * i) / groupNames.length - Math.PI / 2
+      groupCenters[g] = {
+        x: width / 2 + clusterRadius * Math.cos(angle),
+        y: height / 2 + clusterRadius * Math.sin(angle),
+      }
+    })
+    simulation.force('cluster', (alpha) => {
+      for (const n of nodes) {
+        const c = groupCenters[n.type]
+        if (!c) continue
+        n.vx -= (n.x - c.x) * 0.12 * alpha
+        n.vy -= (n.y - c.y) * 0.12 * alpha
+      }
+    })
+  } else {
+    simulation
+      .force('x', d3.forceX(width / 2).strength(0.04))
+      .force('y', d3.forceY(height / 2).strength(0.04))
+  }
   
   currentSimulation = simulation
 
   const g = svg.append('g')
-  
+  svgG = g.node()
+
   // Zoom
   svg.call(d3.zoom().extent([[0, 0], [width, height]]).scaleExtent([0.1, 4]).on('zoom', (event) => {
     g.attr('transform', event.transform)
@@ -647,6 +787,20 @@ const renderGraph = () => {
   linkLabelsRef = linkLabels
   linkLabelBgRef = linkLabelBg
 
+  // Pre-cache bbox for each label once (getBBox in tick is extremely expensive)
+  const edgeLabelMeta = []
+  linkLabels.each(function() {
+    const bbox = this.getBBox()
+    edgeLabelMeta.push({ w: bbox.width, h: bbox.height })
+  })
+
+  // Build edge lookup for animation
+  edgeByPair = {}
+  link.each(function(d) {
+    edgeByPair[`${d.source.id}_${d.target.id}`] = this
+    edgeByPair[`${d.target.id}_${d.source.id}`] = this
+  })
+
   // Nodes group
   const nodeGroup = g.append('g').attr('class', 'nodes')
 
@@ -725,6 +879,10 @@ const renderGraph = () => {
       }
     })
 
+  // Build node lookup for animation
+  nodeByUuid = {}
+  node.each(function(d) { nodeByUuid[d.id] = this })
+
   // Node Labels
   const nodeLabels = nodeGroup.selectAll('text')
     .data(nodes)
@@ -742,27 +900,25 @@ const renderGraph = () => {
     // Update curve paths
     link.attr('d', d => getLinkPath(d))
 
-    // Update edge label positions (no rotation, horizontal is clearer)
-    linkLabels.each(function(d) {
-      const mid = getLinkMidpoint(d)
-      d3.select(this)
-        .attr('x', mid.x)
-        .attr('y', mid.y)
-        .attr('transform', '') // Remove rotation, keep horizontal
-    })
+    // Only update label positions when visible (getBBox in tick is extremely expensive)
+    if (showEdgeLabels.value) {
+      linkLabels.each(function(d) {
+        const mid = getLinkMidpoint(d)
+        d3.select(this).attr('x', mid.x).attr('y', mid.y)
+      })
 
-    // Update edge label background
-    linkLabelBg.each(function(d, i) {
-      const mid = getLinkMidpoint(d)
-      const textEl = linkLabels.nodes()[i]
-      const bbox = textEl.getBBox()
-      d3.select(this)
-        .attr('x', mid.x - bbox.width / 2 - 4)
-        .attr('y', mid.y - bbox.height / 2 - 2)
-        .attr('width', bbox.width + 8)
-        .attr('height', bbox.height + 4)
-        .attr('transform', '') // Remove rotation
-    })
+      // Use pre-cached bbox dimensions — never call getBBox per tick
+      linkLabelBg.each(function(d, i) {
+        const mid = getLinkMidpoint(d)
+        const meta = edgeLabelMeta[i]
+        if (!meta) return
+        d3.select(this)
+          .attr('x', mid.x - meta.w / 2 - 4)
+          .attr('y', mid.y - meta.h / 2 - 2)
+          .attr('width', meta.w + 8)
+          .attr('height', meta.h + 4)
+      })
+    }
 
     node
       .attr('cx', d => d.x)
@@ -782,6 +938,42 @@ const renderGraph = () => {
     linkLabels.attr('fill', '#666')
   })
 }
+
+// ── Message animation ────────────────────────────────────────────────────────
+
+function pulseNode(uuid) {
+  const el = nodeByUuid[uuid]
+  if (!el) return
+  d3.select(el)
+    .transition().duration(120).attr('r', 20)
+    .transition().duration(500).ease(d3.easeElasticOut).attr('r', 10)
+}
+
+function animateDot(srcId, tgtId) {
+  const pathEl = edgeByPair[`${srcId}_${tgtId}`] || edgeByPair[`${tgtId}_${srcId}`]
+  if (!pathEl || !svgG) return
+  const total = pathEl.getTotalLength()
+  if (!total) return
+  const dot = d3.select(svgG).append('circle')
+    .attr('r', 5)
+    .attr('fill', '#e8642a')
+    .attr('pointer-events', 'none')
+    .attr('opacity', 0.85)
+  dot.transition()
+    .duration(700)
+    .ease(d3.easeLinear)
+    .attrTween('cx', () => t => pathEl.getPointAtLength(t * total).x)
+    .attrTween('cy', () => t => pathEl.getPointAtLength(t * total).y)
+    .on('end', () => dot.remove())
+}
+
+watch(() => props.recentActions, (actions) => {
+  if (!actions?.length) return
+  actions.forEach(a => {
+    if (a.srcId) pulseNode(a.srcId)
+    if (a.srcId && a.tgtId) animateDot(a.srcId, a.tgtId)
+  })
+}, { deep: true })
 
 watch(() => props.graphData, () => {
   nextTick(renderGraph)
@@ -960,6 +1152,121 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+/* ── Agent card styles ──────────────────────────────────────────────────── */
+.agent-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.agent-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.agent-identity-text { display: flex; flex-direction: column; gap: 2px; }
+.agent-username { font-size: 14px; font-weight: 700; color: #111; }
+.agent-fullname { font-size: 11px; color: #888; }
+
+.agent-section {
+  padding: 10px 16px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.agent-section:last-child { border-bottom: none; }
+.group-section { background: #fafafa; }
+
+.agent-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aaa;
+  margin-bottom: 6px;
+}
+
+.agent-prose {
+  font-size: 12px;
+  color: #333;
+  line-height: 1.55;
+}
+.agent-prose.small { font-size: 11px; }
+.agent-prose.muted { color: #666; }
+
+.agent-facts-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.agent-fact {
+  display: flex;
+  gap: 4px;
+  font-size: 11px;
+}
+.fact-k { color: #aaa; }
+.fact-v { color: #222; font-weight: 600; }
+
+.agent-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.topic-tag {
+  background: #f0f0f0;
+  color: #555;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+
+.agent-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  font-size: 11px;
+}
+.bar-label { color: #aaa; width: 60px; flex-shrink: 0; }
+.bar-track {
+  flex: 1;
+  height: 6px;
+  background: #e8e8e8;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.bar-fill.activity { background: #e8642a; }
+.sentiment-track { position: relative; overflow: visible; }
+.bar-fill.sentiment { position: absolute; top: 0; height: 100%; border-radius: 2px; min-width: 3px; }
+.bar-val { color: #555; font-weight: 600; min-width: 32px; text-align: right; }
+
+.schedule-badge {
+  background: #1a1a2e;
+  color: #e8c77a;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+}
+.target-tag {
+  background: #fff0e8;
+  color: #c0440f;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid #f5c9b0;
+}
+/* ── end agent card styles ─────────────────────────────────────────────── */
+
 /* Edge Labels Toggle - Top Right */
 .edge-labels-toggle {
   position: absolute;
@@ -1031,7 +1338,7 @@ input:checked + .slider:before {
   position: absolute;
   top: 60px;
   right: 20px;
-  width: 320px;
+  width: 360px;
   max-height: calc(100% - 100px);
   background: #FFF;
   border: 1px solid #EAEAEA;

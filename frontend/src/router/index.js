@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/Home.vue'
+import CreateScenario from '../views/CreateScenario.vue'
 import Process from '../views/MainView.vue'
 import SimulationView from '../views/SimulationView.vue'
 import SimulationRunView from '../views/SimulationRunView.vue'
@@ -10,6 +11,16 @@ const routes = [
   {
     path: '/',
     name: 'Home',
+    component: CreateScenario
+  },
+  {
+    path: '/create',
+    name: 'CreateScenario',
+    component: CreateScenario
+  },
+  {
+    path: '/classic',
+    name: 'ClassicHome',
     component: Home
   },
   {
