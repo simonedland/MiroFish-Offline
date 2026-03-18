@@ -16,7 +16,7 @@ from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 
-from openai import OpenAI
+from openai import AzureOpenAI
 
 from ..config import Config
 from ..utils.logger import get_logger
@@ -166,7 +166,6 @@ class SimulationParameters:
 
     # LLM configuration
     llm_model: str = ""
-    llm_base_url: str = ""
 
     # Generation metadata
     generated_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -186,7 +185,6 @@ class SimulationParameters:
             "twitter_config": asdict(self.twitter_config) if self.twitter_config else None,
             "reddit_config": asdict(self.reddit_config) if self.reddit_config else None,
             "llm_model": self.llm_model,
-            "llm_base_url": self.llm_base_url,
             "generated_at": self.generated_at,
             "generation_reasoning": self.generation_reasoning,
         }
@@ -221,23 +219,13 @@ class SimulationConfigGenerator:
     AGENT_SUMMARY_LENGTH = 300           # Entity summary in agent configuration
     ENTITIES_PER_TYPE_DISPLAY = 20       # Number of entities to display per type
 
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        model_name: Optional[str] = None
-    ):
-        self.api_key = api_key or Config.LLM_API_KEY
-        self.base_url = base_url or Config.LLM_BASE_URL
-        self.model_name = model_name or Config.LLM_MODEL_NAME
-
-        if not self.api_key:
-            raise ValueError("LLM_API_KEY not configured")
-
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
+    def __init__(self):
+        self.client = AzureOpenAI(
+            api_key=Config.AZURE_OPENAI_API_KEY,
+            azure_endpoint=Config.AZURE_OPENAI_ENDPOINT,
+            api_version=Config.AZURE_OPENAI_API_VERSION,
         )
+        self.model_name = Config.AZURE_OPENAI_CHAT_DEPLOYMENT
     
     def generate_config(
         self,
@@ -369,7 +357,6 @@ class SimulationConfigGenerator:
             twitter_config=twitter_config,
             reddit_config=reddit_config,
             llm_model=self.model_name,
-            llm_base_url=self.base_url,
             generation_reasoning=" | ".join(reasoning_parts)
         )
         
