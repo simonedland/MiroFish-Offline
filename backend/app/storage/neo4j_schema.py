@@ -2,6 +2,9 @@
 Neo4j Schema — Cypher queries for index creation and schema management.
 
 Called by Neo4jStorage.create_graph() to set up vector + fulltext indexes.
+
+Neo4j Community 5.15 supports node vector indexes but not relationship
+vector indexes, so relation search falls back to fulltext.
 """
 
 # Constraints
@@ -30,15 +33,6 @@ OPTIONS {indexConfig: {
 }}
 """
 
-CREATE_RELATION_VECTOR_INDEX = """
-CREATE VECTOR INDEX fact_embedding IF NOT EXISTS
-FOR ()-[r:RELATION]-() ON (r.fact_embedding)
-OPTIONS {indexConfig: {
-    `vector.dimensions`: 768,
-    `vector.similarity_function`: 'cosine'
-}}
-"""
-
 # Fulltext indexes (for BM25 keyword search)
 CREATE_ENTITY_FULLTEXT_INDEX = """
 CREATE FULLTEXT INDEX entity_fulltext IF NOT EXISTS
@@ -56,7 +50,6 @@ ALL_SCHEMA_QUERIES = [
     CREATE_ENTITY_UUID_CONSTRAINT,
     CREATE_EPISODE_UUID_CONSTRAINT,
     CREATE_ENTITY_VECTOR_INDEX,
-    CREATE_RELATION_VECTOR_INDEX,
     CREATE_ENTITY_FULLTEXT_INDEX,
     CREATE_FACT_FULLTEXT_INDEX,
 ]

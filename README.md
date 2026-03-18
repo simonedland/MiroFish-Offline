@@ -58,6 +58,7 @@ cd MiroFish-Offline
 cp .env.example .env
 
 # Start all services (Neo4j, Ollama, MiroFish)
+# Default stack is CPU-safe and works without NVIDIA/WSL GPU passthrough.
 docker compose up -d
 
 # Pull the required models into Ollama
@@ -65,7 +66,33 @@ docker exec mirofish-ollama ollama pull qwen2.5:32b
 docker exec mirofish-ollama ollama pull nomic-embed-text
 ```
 
+If you have NVIDIA GPU passthrough working in Docker Desktop / WSL2, start Ollama with the GPU override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+```
+
+On some Windows Docker Desktop setups, Neo4j can take a little longer to become ready than Compose expects. The backend now retries the Neo4j connection during startup, so `docker compose up -d` no longer needs to block on the Neo4j health state.
+
 Open `http://localhost:3000` — that's it.
+
+### Intel NPU quick test
+
+If you have an Intel NPU exposed as `Intel(R) AI Boost`, the repo now includes a small host-side sentiment script that runs on OpenVINO without changing the main Docker stack.
+
+Install the extra host dependencies:
+
+```bash
+pip install -r backend/requirements-npu.txt
+```
+
+Run the NPU sentiment test:
+
+```bash
+python backend/scripts/npu_sentiment.py "This launch looks strong and demand is improving"
+```
+
+This uses the exported OpenVINO model under `models/openvino-distilbert-sst2` and targets the `NPU` device by default.
 
 ### Option B: Manual
 
@@ -115,7 +142,7 @@ All settings are in `.env` (copy from `.env.example`):
 # LLM — points to local Ollama (OpenAI-compatible API)
 LLM_API_KEY=ollama
 LLM_BASE_URL=http://localhost:11434/v1
-LLM_MODEL_NAME=qwen2.5:32b
+LLM_MODEL_NAME=qwen2.5:7b
 
 # Neo4j
 NEO4J_URI=bolt://localhost:7687
@@ -126,6 +153,8 @@ NEO4J_PASSWORD=mirofish
 EMBEDDING_MODEL=nomic-embed-text
 EMBEDDING_BASE_URL=http://localhost:11434
 ```
+
+When you run via Docker Compose, the app container overrides these endpoints automatically to use the internal service names `ollama` and `neo4j`, so you do not need to change `.env` just to make the containerized stack work.
 
 Works with any OpenAI-compatible API — swap Ollama for Claude, GPT, or any other provider by changing `LLM_BASE_URL` and `LLM_API_KEY`.
 
@@ -181,7 +210,7 @@ This fork introduces a clean abstraction layer between the application and the g
 | Disk | 20 GB | 50 GB |
 | CPU | 4 cores | 8+ cores |
 
-CPU-only mode works but is significantly slower for LLM inference. For lighter setups, use `qwen2.5:14b` or `qwen2.5:7b`.
+CPU-only mode works but is significantly slower for LLM inference. On laptops and systems without a discrete GPU, start with `qwen2.5:7b`. Move to `qwen2.5:14b` or `qwen2.5:32b` only if you have enough RAM/VRAM.
 
 ## Use Cases
 

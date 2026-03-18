@@ -1,8 +1,9 @@
 """
-SearchService — hybrid search (vector + keyword) over Neo4j graph data.
+SearchService — hybrid search over Neo4j graph data.
 
-Replaces Zep Cloud's built-in search with reranker.
-Scoring: 0.7 * vector_score + 0.3 * keyword_score (BM25 via fulltext index).
+Entity search uses vector + keyword scoring.
+Relation search uses keyword scoring only because Neo4j Community 5.15 does
+not support relationship vector indexes.
 """
 
 import logging
@@ -13,16 +14,6 @@ from neo4j import Session as Neo4jSession
 from .embedding_service import EmbeddingService
 
 logger = logging.getLogger('mirofish.search')
-
-# Cypher for vector search on edges (facts)
-_VECTOR_SEARCH_EDGES = """
-CALL db.index.vector.queryRelationships('fact_embedding', $limit, $query_vector)
-YIELD relationship, score
-WHERE relationship.graph_id = $graph_id
-RETURN relationship AS r, score
-ORDER BY score DESC
-LIMIT $limit
-"""
 
 # Cypher for vector search on nodes (entities)
 _VECTOR_SEARCH_NODES = """
@@ -76,23 +67,13 @@ class SearchService:
 
         Returns list of dicts with edge properties + 'score'.
         """
-        query_vector = self.embedding.embed(query)
-
-        # Vector search
-        vector_results = self._run_edge_vector_search(
-            session, graph_id, query_vector, limit * 2
-        )
-
-        # Keyword search
         keyword_results = self._run_edge_keyword_search(
             session, graph_id, query, limit * 2
         )
 
-        # Merge and rank
-        merged = self._merge_results(
-            vector_results, keyword_results, key="uuid", limit=limit
-        )
-        return merged
+        # Neo4j CE 5.15 does not support relationship vector indexes.
+        # Keep relation search available through fulltext scoring only.
+        return self._merge_results([], keyword_results, key="uuid", limit=limit)
 
     def search_nodes(
         self,
@@ -120,25 +101,6 @@ class SearchService:
             vector_results, keyword_results, key="uuid", limit=limit
         )
         return merged
-
-    def _run_edge_vector_search(
-        self, session: Neo4jSession, graph_id: str, query_vector: List[float], limit: int
-    ) -> List[Dict[str, Any]]:
-        """Run vector similarity search on edge fact_embedding."""
-        try:
-            result = session.run(
-                _VECTOR_SEARCH_EDGES,
-                graph_id=graph_id,
-                query_vector=query_vector,
-                limit=limit,
-            )
-            return [
-                {**dict(record["r"]), "uuid": record["r"]["uuid"], "_score": record["score"]}
-                for record in result
-            ]
-        except Exception as e:
-            logger.warning(f"Vector edge search failed (index may not exist yet): {e}")
-            return []
 
     def _run_edge_keyword_search(
         self, session: Neo4jSession, graph_id: str, query: str, limit: int

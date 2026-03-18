@@ -3,6 +3,7 @@ MiroFish Backend - Flask Application Factory
 """
 
 import os
+import time
 import warnings
 
 # Suppress multiprocessing resource_tracker warnings (from third-party libraries like transformers)
@@ -14,6 +15,40 @@ from flask_cors import CORS
 
 from .config import Config
 from .utils.logger import setup_logger, get_logger
+
+
+def _init_neo4j_storage(logger, should_log_startup):
+    """Initialize Neo4j storage with retries to tolerate container startup lag."""
+    from .storage import Neo4jStorage
+
+    timeout_seconds = int(os.environ.get('NEO4J_INIT_TIMEOUT', '90'))
+    retry_interval = int(os.environ.get('NEO4J_INIT_RETRY_INTERVAL', '3'))
+    deadline = time.time() + timeout_seconds
+    attempt = 1
+    last_error = None
+
+    while time.time() < deadline:
+        try:
+            storage = Neo4jStorage()
+            if should_log_startup:
+                logger.info("Neo4jStorage initialized (connected to %s)", Config.NEO4J_URI)
+            return storage
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                "Neo4jStorage initialization attempt %s failed: %s",
+                attempt,
+                exc,
+            )
+            attempt += 1
+            time.sleep(retry_interval)
+
+    logger.error(
+        "Neo4jStorage initialization failed after %ss: %s",
+        timeout_seconds,
+        last_error,
+    )
+    return None
 
 
 def create_app(config_class=Config):
@@ -43,16 +78,7 @@ def create_app(config_class=Config):
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     # --- Initialize Neo4jStorage singleton (DI via app.extensions) ---
-    from .storage import Neo4jStorage
-    try:
-        neo4j_storage = Neo4jStorage()
-        app.extensions['neo4j_storage'] = neo4j_storage
-        if should_log_startup:
-            logger.info("Neo4jStorage initialized (connected to %s)", Config.NEO4J_URI)
-    except Exception as e:
-        logger.error("Neo4jStorage initialization failed: %s", e)
-        # Store None so endpoints can return 503 gracefully
-        app.extensions['neo4j_storage'] = None
+    app.extensions['neo4j_storage'] = _init_neo4j_storage(logger, should_log_startup)
 
     # Register simulation process cleanup function (ensure all simulation processes terminate on server shutdown)
     from .services.simulation_runner import SimulationRunner
