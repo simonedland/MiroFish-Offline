@@ -25,6 +25,8 @@ class LLMClient:
             raise ValueError("AZURE_OPENAI_API_KEY not configured")
         if not Config.AZURE_OPENAI_ENDPOINT:
             raise ValueError("AZURE_OPENAI_ENDPOINT not configured")
+        if not self.model:
+            raise ValueError("AZURE_OPENAI_CHAT_DEPLOYMENT not configured")
 
         self.client = AzureOpenAI(
             api_key=Config.AZURE_OPENAI_API_KEY,
