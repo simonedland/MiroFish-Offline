@@ -981,58 +981,38 @@ def _get_comment_info(
     return None
 
 
-def create_model(config: Dict[str, Any], use_boost: bool = False):
+def create_model(config: Dict[str, Any]):
     """
     Create LLM model
-    
-    Support dual LLM configuration for acceleration during parallel simulation：
-    - Common configuration：LLM_API_KEY, LLM_BASE_URL, LLM_MODEL_NAME
-    - Acceleration configuration (optional)：LLM_BOOST_API_KEY, LLM_BOOST_BASE_URL, LLM_BOOST_MODEL_NAME
-    
-    If acceleration LLM is configured, different platforms can use different API providers during parallel simulation to improve concurrency.
-    
+
+    Reads Azure OpenAI configuration from project root .env file:
+    - AZURE_OPENAI_API_KEY: Azure API key
+    - AZURE_OPENAI_ENDPOINT: Azure endpoint URL
+    - AZURE_OPENAI_CHAT_DEPLOYMENT: Chat deployment name
+
     Args:
         config: Simulation configuration dictionary
-        use_boost: Whether to use acceleration LLM configuration (if available)
     """
-    # Check if acceleration configuration exists
-    boost_api_key = os.environ.get("LLM_BOOST_API_KEY", "")
-    boost_base_url = os.environ.get("LLM_BOOST_BASE_URL", "")
-    boost_model = os.environ.get("LLM_BOOST_MODEL_NAME", "")
-    has_boost_config = bool(boost_api_key)
-    
-    # Choose which LLM to use based on parameters and configuration
-    if use_boost and has_boost_config:
-        # Use acceleration configuration
-        llm_api_key = boost_api_key
-        llm_base_url = boost_base_url
-        llm_model = boost_model or os.environ.get("LLM_MODEL_NAME", "")
-        config_label = "[Acceleration LLM]"
-    else:
-        # useCommon configuration
-        llm_api_key = os.environ.get("LLM_API_KEY", "")
-        llm_base_url = os.environ.get("LLM_BASE_URL", "")
-        llm_model = os.environ.get("LLM_MODEL_NAME", "")
-        config_label = "[Common LLM]"
-    
-    # If model name is not in .env, use config as fallback
+    azure_api_key = os.environ.get("AZURE_OPENAI_API_KEY", "")
+    azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
+    azure_api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01")
+    llm_model = os.environ.get("AZURE_OPENAI_CHAT_DEPLOYMENT", "")
+
     if not llm_model:
-        llm_model = config.get("llm_model", "gpt-4o-mini")
-    
-    # Set environment variables required by camel-ai
-    if llm_api_key:
-        os.environ["OPENAI_API_KEY"] = llm_api_key
-    
-    if not os.environ.get("OPENAI_API_KEY"):
-        raise ValueError("Missing API Key configuration, please set LLM_API_KEY in .env file in project root")
-    
-    if llm_base_url:
-        os.environ["OPENAI_API_BASE_URL"] = llm_base_url
-    
-    print(f"{config_label} model={llm_model}, base_url={llm_base_url[:40] if llm_base_url else 'default'}...")
-    
+        llm_model = config.get("llm_model", "model-router")
+
+    if not azure_api_key:
+        raise ValueError("Missing API Key configuration, please set AZURE_OPENAI_API_KEY in .env file in project root")
+
+    # Set env vars required by CAMEL-AI Azure platform
+    os.environ["AZURE_OPENAI_API_KEY"] = azure_api_key
+    os.environ["AZURE_OPENAI_BASE_URL"] = azure_endpoint
+    os.environ["AZURE_API_VERSION"] = azure_api_version
+
+    print(f"LLM configuration: model={llm_model}, endpoint={azure_endpoint[:40] if azure_endpoint else 'default'}...")
+
     return ModelFactory.create(
-        model_platform=ModelPlatformType.OPENAI,
+        model_platform=ModelPlatformType.AZURE,
         model_type=llm_model,
     )
 
@@ -1126,8 +1106,7 @@ async def run_twitter_simulation(
     
     log_info("Initializing...")
     
-    # Twitter use common LLM configuration
-    model = create_model(config, use_boost=False)
+    model = create_model(config)
     
     # OASIS Twitter uses CSV format
     profile_path = os.path.join(simulation_dir, "twitter_profiles.csv")
@@ -1318,8 +1297,7 @@ async def run_reddit_simulation(
     
     log_info("Initializing...")
     
-    # Reddit use acceleration LLM configuration(if available，otherwise fallback toCommon configuration）
-    model = create_model(config, use_boost=True)
+    model = create_model(config)
     
     profile_path = os.path.join(simulation_dir, "reddit_profiles.json")
     if not os.path.exists(profile_path):

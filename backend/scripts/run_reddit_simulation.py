@@ -434,35 +434,32 @@ class RedditSimulationRunner:
     def _create_model(self):
         """
         Create LLM model
-        
-        Unified use of configuration in project root .env file (highest priority)：
-        - LLM_API_KEY: API key
-        - LLM_BASE_URL: API base URL
-        - LLM_MODEL_NAME: Model name
+
+        Reads Azure OpenAI configuration from project root .env file:
+        - AZURE_OPENAI_API_KEY: Azure API key
+        - AZURE_OPENAI_ENDPOINT: Azure endpoint URL
+        - AZURE_OPENAI_CHAT_DEPLOYMENT: Chat deployment name
         """
-        # Read configuration from .env first
-        llm_api_key = os.environ.get("LLM_API_KEY", "")
-        llm_base_url = os.environ.get("LLM_BASE_URL", "")
-        llm_model = os.environ.get("LLM_MODEL_NAME", "")
-        
-        # If not in .env, use config as fallback
+        azure_api_key = os.environ.get("AZURE_OPENAI_API_KEY", "")
+        azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
+        azure_api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01")
+        llm_model = os.environ.get("AZURE_OPENAI_CHAT_DEPLOYMENT", "")
+
         if not llm_model:
-            llm_model = self.config.get("llm_model", "gpt-4o-mini")
-        
-        # Set environment variables required by camel-ai
-        if llm_api_key:
-            os.environ["OPENAI_API_KEY"] = llm_api_key
-        
-        if not os.environ.get("OPENAI_API_KEY"):
-            raise ValueError("Missing API Key configuration, please set LLM_API_KEY in .env file in project root")
-        
-        if llm_base_url:
-            os.environ["OPENAI_API_BASE_URL"] = llm_base_url
-        
-        print(f"LLM configuration: model={llm_model}, base_url={llm_base_url[:40] if llm_base_url else 'default'}...")
-        
+            llm_model = self.config.get("llm_model", "model-router")
+
+        if not azure_api_key:
+            raise ValueError("Missing API Key configuration, please set AZURE_OPENAI_API_KEY in .env file in project root")
+
+        # Set env vars required by CAMEL-AI Azure platform
+        os.environ["AZURE_OPENAI_API_KEY"] = azure_api_key
+        os.environ["AZURE_OPENAI_BASE_URL"] = azure_endpoint
+        os.environ["AZURE_API_VERSION"] = azure_api_version
+
+        print(f"LLM configuration: model={llm_model}, endpoint={azure_endpoint[:40] if azure_endpoint else 'default'}...")
+
         return ModelFactory.create(
-            model_platform=ModelPlatformType.OPENAI,
+            model_platform=ModelPlatformType.AZURE,
             model_type=llm_model,
         )
     
