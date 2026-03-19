@@ -84,3 +84,66 @@ class RelationshipGenerator:
 
     def _negotiate_all(self, profiles, groups):
         raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Tool implementations
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _tool_list_agents(profiles_by_id: Dict[int, Dict]) -> str:
+        """list_agents() → JSON array sorted ascending by user_id."""
+        roster = []
+        for uid in sorted(profiles_by_id.keys()):
+            p = profiles_by_id[uid]
+            bio = (p.get("bio") or "")[:80].replace("\n", " ")
+            roster.append({
+                "id": uid,
+                "username": p.get("username", p.get("user_name", f"agent_{uid}")),
+                "group": p.get("group_id", ""),
+                "bio_snippet": bio,
+            })
+        return json.dumps(roster)
+
+    @staticmethod
+    def _tool_get_agent_profile(agent_id: int, profiles_by_id: Dict[int, Dict]) -> str:
+        """get_agent_profile(agent_id) → JSON profile or error."""
+        if agent_id not in profiles_by_id:
+            return json.dumps({"error": f"agent_id {agent_id} not found"})
+        return json.dumps(profiles_by_id[agent_id])
+
+    @staticmethod
+    def _tool_get_full_graph(shared_graph: List[Dict]) -> str:
+        """get_full_graph() → JSON array of committed edges."""
+        return json.dumps(shared_graph)
+
+    @staticmethod
+    def _tool_declare_relationship(
+        src_id: int,
+        tgt_id: int,
+        rel_type: str,
+        label: str,
+        profiles_by_id: Dict[int, Dict],
+        staged_buffer: List[Dict],
+    ) -> str:
+        """declare_relationship(...) → 'ok' or error string."""
+        if tgt_id not in profiles_by_id:
+            return f"error: tgt_id {tgt_id} does not exist"
+        if src_id == tgt_id:
+            return "error: src_id and tgt_id must be different"
+        rel_type = str(rel_type).upper()
+        if rel_type not in VALID_TYPES:
+            return f"error: type must be one of {sorted(VALID_TYPES)}"
+        if not label or not str(label).strip():
+            return "error: label is required and must be non-empty"
+        label = str(label)[:120]
+
+        # Deduplicate within this agent's staged buffer
+        for existing in staged_buffer:
+            if existing["src_id"] == src_id and existing["tgt_id"] == tgt_id:
+                # Silently replace with latest declaration
+                existing["type"] = rel_type
+                existing["label"] = label
+                return "ok"
+
+        staged_buffer.append({"src_id": src_id, "tgt_id": tgt_id, "type": rel_type, "label": label})
+        return "ok"

@@ -127,3 +127,108 @@ class TestDegenerateInputs:
 
         # Result should be fresh (empty, since agents declared nothing)
         assert result == []
+
+
+class TestToolFunctions:
+    """Test the four tool methods directly — no LLM involved."""
+
+    def setup_method(self):
+        self.profiles_by_id = {p["user_id"]: p for p in PROFILES}
+
+    # list_agents --------------------------------------------------------
+
+    def test_list_agents_returns_sorted_roster(self):
+        result = json.loads(RelationshipGenerator._tool_list_agents(self.profiles_by_id))
+        ids = [r["id"] for r in result]
+        assert ids == sorted(ids)
+        assert len(result) == 3
+        assert result[0]["username"] == "alice"
+
+    def test_list_agents_bio_snippet_truncated(self):
+        long_bio_profiles = {
+            0: {**PROFILES[0], "bio": "x" * 200},
+        }
+        result = json.loads(RelationshipGenerator._tool_list_agents(long_bio_profiles))
+        assert len(result[0]["bio_snippet"]) == 80
+
+    # get_agent_profile --------------------------------------------------
+
+    def test_get_agent_profile_returns_profile(self):
+        result = json.loads(RelationshipGenerator._tool_get_agent_profile(1, self.profiles_by_id))
+        assert result["username"] == "bob"
+
+    def test_get_agent_profile_unknown_id_returns_error(self):
+        result = json.loads(RelationshipGenerator._tool_get_agent_profile(99, self.profiles_by_id))
+        assert "error" in result
+
+    # get_full_graph -----------------------------------------------------
+
+    def test_get_full_graph_returns_edges(self):
+        graph = [{"src_id": 0, "tgt_id": 1, "type": "FOLLOWS", "label": "friends"}]
+        result = json.loads(RelationshipGenerator._tool_get_full_graph(graph))
+        assert len(result) == 1
+        assert result[0]["type"] == "FOLLOWS"
+
+    def test_get_full_graph_empty(self):
+        result = json.loads(RelationshipGenerator._tool_get_full_graph([]))
+        assert result == []
+
+    # declare_relationship -----------------------------------------------
+
+    def test_declare_relationship_valid(self):
+        staged = []
+        out = RelationshipGenerator._tool_declare_relationship(
+            0, 1, "FOLLOWS", "alice follows bob", self.profiles_by_id, staged
+        )
+        assert out == "ok"
+        assert len(staged) == 1
+        assert staged[0] == {"src_id": 0, "tgt_id": 1, "type": "FOLLOWS", "label": "alice follows bob"}
+
+    def test_declare_relationship_unknown_target(self):
+        staged = []
+        out = RelationshipGenerator._tool_declare_relationship(
+            0, 99, "FOLLOWS", "test", self.profiles_by_id, staged
+        )
+        assert "error" in out
+        assert staged == []
+
+    def test_declare_relationship_self_loop(self):
+        staged = []
+        out = RelationshipGenerator._tool_declare_relationship(
+            0, 0, "FOLLOWS", "test", self.profiles_by_id, staged
+        )
+        assert "error" in out
+
+    def test_declare_relationship_invalid_type(self):
+        staged = []
+        out = RelationshipGenerator._tool_declare_relationship(
+            0, 1, "HATES", "test", self.profiles_by_id, staged
+        )
+        assert "error" in out
+
+    def test_declare_relationship_empty_label(self):
+        staged = []
+        out = RelationshipGenerator._tool_declare_relationship(
+            0, 1, "FOLLOWS", "", self.profiles_by_id, staged
+        )
+        assert "error" in out
+
+    def test_declare_relationship_label_truncated_to_120(self):
+        staged = []
+        RelationshipGenerator._tool_declare_relationship(
+            0, 1, "FOLLOWS", "x" * 200, self.profiles_by_id, staged
+        )
+        assert len(staged[0]["label"]) == 120
+
+    def test_declare_relationship_deduplicates_within_buffer(self):
+        staged = []
+        RelationshipGenerator._tool_declare_relationship(
+            0, 1, "FOLLOWS", "first", self.profiles_by_id, staged
+        )
+        RelationshipGenerator._tool_declare_relationship(
+            0, 1, "KNOWS", "second", self.profiles_by_id, staged
+        )
+        # Should update, not append
+        assert len(staged) == 1
+        assert staged[0]["type"] == "KNOWS"
+        assert staged[0]["label"] == "second"
