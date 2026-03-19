@@ -1585,10 +1585,17 @@ def start_simulation():
                 "error": "Please provide simulation_id"
             }), 400
 
+        simulation_mode = data.get('simulation_mode', 'oasis')  # "oasis" | "sms"
         platform = data.get('platform', 'parallel')
         max_rounds = data.get('max_rounds')  # Optional: Maximum simulation rounds
         enable_graph_memory_update = data.get('enable_graph_memory_update', False)  # Optional：IsFalseEnable knowledge graph memory update
         force = data.get('force', False)  # Optional：Force restart
+
+        # SMS simulation mode: short-circuit to dedicated runner
+        if simulation_mode == 'sms':
+            manager = SimulationManager()
+            result = manager.start_sms_simulation(simulation_id)
+            return jsonify({"success": True, "data": result})
 
         # Verify max_rounds Parameters
         if max_rounds is not None:

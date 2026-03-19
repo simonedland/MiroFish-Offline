@@ -49,7 +49,10 @@ class SimulationState:
     # Platform enabled state
     enable_twitter: bool = True
     enable_reddit: bool = True
-    
+
+    # Simulation mode
+    simulation_mode: str = "oasis"  # "oasis" | "sms"
+
     # Status
     status: SimulationStatus = SimulationStatus.CREATED
     
@@ -88,6 +91,7 @@ class SimulationState:
             "graph_id": self.graph_id,
             "enable_twitter": self.enable_twitter,
             "enable_reddit": self.enable_reddit,
+            "simulation_mode": self.simulation_mode,
             "status": self.status.value,
             "entities_count": self.entities_count,
             "profiles_count": self.profiles_count,
@@ -186,6 +190,7 @@ class SimulationManager:
             graph_id=data.get("graph_id", ""),
             enable_twitter=data.get("enable_twitter", True),
             enable_reddit=data.get("enable_reddit", True),
+            simulation_mode=data.get("simulation_mode", "oasis"),
             status=SimulationStatus(data.get("status", "created")),
             entities_count=data.get("entities_count", 0),
             profiles_count=data.get("profiles_count", 0),
@@ -655,6 +660,95 @@ class SimulationManager:
             state.status = SimulationStatus.FAILED
             state.error = str(exc)
             self._save_simulation_state(state)
+
+    def start_sms_simulation(self, simulation_id: str) -> dict:
+        """Start an SMS-mode simulation as a background thread."""
+        import threading
+        import asyncio
+        import json as _json
+        from .sms_db import init_db, register_agents
+        from .sms_simulation_runner import SmsSimulationRunner
+
+        state = self.get_simulation(simulation_id)
+        if state is None:
+            raise ValueError(f"Simulation {simulation_id} not found")
+
+        sim_dir = self._get_simulation_dir(simulation_id)
+
+        # Load profiles (get_profiles returns List[Dict]), reconstruct as OasisAgentProfile objects
+        raw_profiles = self.get_profiles(simulation_id)
+        if not raw_profiles:
+            raise ValueError("No profiles found for simulation")
+
+        profiles = []
+        for p in raw_profiles:
+            uid = p.get("user_id", 0)
+            profile = OasisAgentProfile(
+                user_id=uid,
+                user_name=p.get("username", p.get("user_name", "")),
+                name=p.get("name", ""),
+                bio=p.get("bio", ""),
+                persona=p.get("persona", ""),
+                phone_number=p.get("phone_number") or f"+1555{uid:04d}",
+                karma=p.get("karma", 1000),
+                age=p.get("age"),
+                gender=p.get("gender"),
+                mbti=p.get("mbti"),
+                country=p.get("country"),
+                profession=p.get("profession"),
+                interested_topics=p.get("interested_topics", []),
+                group_id=p.get("group_id", ""),
+            )
+            profiles.append(profile)
+
+        # Load relationships
+        relationships_path = os.path.join(sim_dir, "relationships_ai.json")
+        relationships = {}
+        if os.path.exists(relationships_path):
+            with open(relationships_path, "r", encoding="utf-8") as f:
+                relationships = _json.load(f)
+
+        # Load config for total_rounds
+        config_path = os.path.join(sim_dir, "simulation_config.json")
+        config = {}
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = _json.load(f)
+
+        total_rounds = config.get("max_rounds") or config.get("total_rounds") or 10
+
+        # Init SMS DB
+        init_db(simulation_id)
+        register_agents(simulation_id, profiles)
+
+        # Update state to RUNNING
+        state.status = SimulationStatus.RUNNING
+        self._save_simulation_state(state)
+
+        def _run_in_thread():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                runner = SmsSimulationRunner(
+                    simulation_id=simulation_id,
+                    profiles=profiles,
+                    relationships=relationships,
+                    config={"total_rounds": total_rounds},
+                )
+                loop.run_until_complete(runner.run())
+                state.status = SimulationStatus.COMPLETED
+                self._save_simulation_state(state)
+            except Exception as exc:
+                logger.error("SMS simulation %s failed: %s", simulation_id, exc, exc_info=True)
+                state.status = SimulationStatus.FAILED
+                self._save_simulation_state(state)
+            finally:
+                loop.close()
+
+        thread = threading.Thread(target=_run_in_thread, daemon=True, name=f"sms-sim-{simulation_id}")
+        thread.start()
+
+        return {"simulation_id": simulation_id, "mode": "sms", "status": "started"}
 
     def get_simulation(self, simulation_id: str) -> Optional[SimulationState]:
         """Get simulation state"""
