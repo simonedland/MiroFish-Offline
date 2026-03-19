@@ -267,7 +267,7 @@ class RelationshipGenerator:
     ) -> List[Dict[str, Any]]:
         """Iterate agents sequentially; each runs its own agentic loop."""
         profiles_sorted = sorted(profiles, key=lambda p: p.get("user_id", p.get("id", 0)))
-        profiles_by_id = {p.get("user_id", p.get("id")): p for p in profiles_sorted}
+        profiles_by_id = {p.get("user_id", p.get("id", 0)): p for p in profiles_sorted}
 
         shared_graph: List[Dict] = []
         failed = 0
