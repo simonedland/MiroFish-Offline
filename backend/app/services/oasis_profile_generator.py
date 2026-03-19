@@ -34,6 +34,7 @@ class OasisAgentProfile:
     name: str
     bio: str
     persona: str
+    phone_number: str = ""
 
     # Optional fields - Reddit style
     karma: int = 1000
@@ -911,6 +912,7 @@ Important:
                     user_id=idx,
                     use_llm=use_llm
                 )
+                profile.phone_number = f"+1555{profile.user_id:04d}"
 
                 # Real-time output generated persona to console and log
                 self._print_generated_profile(entity.name, entity_type, profile)
@@ -929,6 +931,7 @@ Important:
                     source_entity_uuid=entity.uuid,
                     source_entity_type=entity_type,
                 )
+                fallback_profile.phone_number = f"+1555{fallback_profile.user_id:04d}"
                 return idx, fallback_profile, str(e)
 
         logger.info(f"Starting parallel generation of {total} agent personas (parallel count: {parallel_count})...")
@@ -976,7 +979,7 @@ Important:
                     logger.error(f"Exception occurred while processing entity {entity.name}: {str(e)}")
                     with lock:
                         completed_count[0] += 1
-                    profiles[idx] = OasisAgentProfile(
+                    fallback = OasisAgentProfile(
                         user_id=idx,
                         user_name=self._generate_username(entity.name),
                         name=entity.name,
@@ -985,6 +988,8 @@ Important:
                         source_entity_uuid=entity.uuid,
                         source_entity_type=entity_type,
                     )
+                    fallback.phone_number = f"+1555{fallback.user_id:04d}"
+                    profiles[idx] = fallback
                     # Real-time file writing (even for fallback personas)
                     save_profiles_realtime()
 
