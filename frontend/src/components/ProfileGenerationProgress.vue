@@ -35,7 +35,7 @@
         <span :style="s.phaseNum">3</span>
         <span :style="[s.phaseLabel, phase >= 3 ? s.activeLabel : s.dimLabel]">Establishing agent relations</span>
         <span :style="[s.phaseBadge, phaseColor(3)]">
-          {{ phase > 3 ? 'done' : phase === 3 ? connProgress + '/' + connTotal + ' links' : 'waiting' }}
+          {{ phase > 3 ? 'done' : phase === 3 ? (relAgentTotal > 0 ? relAgentCurrent + '/' + relAgentTotal + ' agents · ' + relCount + ' links' : 'starting...') : 'waiting' }}
         </span>
       </div>
       <div :style="s.barTrack">
@@ -76,89 +76,20 @@ const simStatus         = ref('preparing')
 const errorMsg          = ref('')
 let pollTimer = null
 
-// ── Phase 3 connection animation ─────────────────────────────────────────────
-const INTRA_TYPES  = ['KNOWS', 'COORDINATES', 'AGREES_WITH', 'TRUSTS', 'ALIGNS_WITH']
-const CROSS_TYPES  = ['REPLIES', 'FOLLOWS', 'MENTIONS', 'REACTS_TO', 'DISPUTES', 'CHALLENGES']
-const connProgress   = ref(0)
-const connTotal      = ref(0)
-const connTick       = ref(0)   // key for transition re-trigger
-const connCurrentType = ref('KNOWS')
-const connPairLabel  = ref('')
-let connTimer = null
+// ── Phase 3: real relationship progress from backend ─────────────────────────
+const relAgentCurrent = ref(0)
+const relAgentTotal   = ref(0)
+const relCount        = ref(0)
 
-// Build a flat list of (srcGroup, tgtGroup, relType) connection pairs to cycle through
-function buildConnPairs() {
-  const groups = props.groups || []
-  if (!groups.length) return null  // fallback to index-based
-  const pairs = []
-  groups.forEach(g => {
-    const targets = g.interacts_with?.length ? g.interacts_with : []
-    // intra-group pairs
-    for (let k = 0; k < 4; k++) {
-      pairs.push({ src: g.name, tgt: g.name, type: INTRA_TYPES[k % INTRA_TYPES.length] })
-    }
-    // cross-group pairs
-    targets.forEach(t => {
-      for (let k = 0; k < 3; k++) {
-        pairs.push({ src: g.name, tgt: t, type: CROSS_TYPES[k % CROSS_TYPES.length] })
-      }
-    })
-    // if no explicit targets, pair with every other group
-    if (!targets.length && groups.length > 1) {
-      groups.forEach(other => {
-        if (other.name !== g.name) {
-          pairs.push({ src: g.name, tgt: other.name, type: CROSS_TYPES[Math.floor(Math.random() * CROSS_TYPES.length)] })
-        }
-      })
-    }
-  })
-  return pairs.length ? pairs : null
-}
-
-function startConnAnimation() {
-  if (connTimer) return
-  const n = totalAgents.value || 50
-  connTotal.value  = Math.round(n * 3.2)
-  connProgress.value = 0
-
-  const pairs    = buildConnPairs()
-  const duration = 12000
-  const steps    = connTotal.value
-  const interval = Math.max(40, Math.round(duration / steps))
-
-  connTimer = setInterval(() => {
-    if (connProgress.value >= connTotal.value) {
-      clearInterval(connTimer)
-      connTimer = null
-      return
-    }
-    const jump = Math.ceil(Math.random() * 3)
-    connProgress.value = Math.min(connTotal.value, connProgress.value + jump)
-    connTick.value++
-
-    if (pairs) {
-      // Cycle through group-aware pairs, occasionally shuffle
-      const idx = (connTick.value + Math.floor(Math.random() * 2)) % pairs.length
-      const p = pairs[idx]
-      connCurrentType.value = p.type
-      const arrow = p.src === p.tgt ? '↔' : '→'
-      connPairLabel.value = `${p.src} ${arrow} ${p.tgt}`
-    } else {
-      // Fallback: agent index pairs
-      if (connTick.value % 8 === 0) {
-        connCurrentType.value = INTRA_TYPES[Math.floor(Math.random() * INTRA_TYPES.length)]
-      }
-      const a = Math.floor(Math.random() * n)
-      let b = Math.floor(Math.random() * n)
-      if (b === a) b = (a + 1) % n
-      connPairLabel.value = `agent_${a} ↔ agent_${b}`
-    }
-  }, interval)
-}
-
-function stopConnAnimation() {
-  if (connTimer) { clearInterval(connTimer); connTimer = null }
-}
+const connProgress  = computed(() => relAgentCurrent.value)
+const connTotal     = computed(() => relAgentTotal.value || totalAgents.value || 1)
+const connPairLabel = computed(() =>
+  relAgentTotal.value > 0
+    ? `agent ${relAgentCurrent.value} / ${relAgentTotal.value}`
+    : ''
+)
+const connCurrentType = computed(() => `${relCount.value} links`)
+const connTick = ref(0)
 
 // Which phase are we in: 1=profiles, 2=configs, 3=relations, 4=done
 const phase = computed(() => {
@@ -188,7 +119,7 @@ const phase3Pct = computed(() => {
   if (phase.value > 3) return 100
   if (phase.value < 3) return 0
   if (!connTotal.value) return 5
-  return Math.min(95, Math.round((connProgress.value / connTotal.value) * 95))
+  return Math.min(99, Math.round((connProgress.value / connTotal.value) * 100))
 })
 
 const phaseColor = (n) => {
@@ -203,10 +134,7 @@ const phaseBarColor = (n) => {
   return { background: '#2a2a2a' }
 }
 
-watch(phase, (p) => {
-  if (p === 3) startConnAnimation()
-  else if (p > 3) { stopConnAnimation(); connProgress.value = connTotal.value }
-})
+watch(relAgentCurrent, () => { connTick.value++ })
 
 async function poll() {
   try {
@@ -217,6 +145,9 @@ async function poll() {
     profilesCount.value      = data.profiles_count || 0
     configBatchCurrent.value = data.config_batch_current || 0
     configBatchTotal.value   = data.config_batch_total   || 0
+    relAgentCurrent.value    = data.relationship_agent_current || 0
+    relAgentTotal.value      = data.relationship_agent_total   || 0
+    relCount.value           = data.relationship_count         || 0
 
     if (data.total_agents && data.total_agents > 0) {
       totalAgents.value = data.total_agents
@@ -242,7 +173,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearInterval(pollTimer)
-  stopConnAnimation()
 })
 
 const s = {

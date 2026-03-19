@@ -863,8 +863,15 @@ def get_simulation_relationships(simulation_id: str):
             except Exception as e:
                 logger.warning(f"Could not read scenario_definition.json: {e}")
 
+        def _rel_progress(agent_current: int, agent_total: int, rel_count: int) -> None:
+            if state:
+                state.relationship_agent_current = agent_current
+                state.relationship_agent_total = agent_total
+                state.relationship_count = rel_count
+                manager._save_simulation_state(state)
+
         gen = RelationshipGenerator()
-        edges = gen.generate(sim_dir, profiles, groups, force=force)
+        edges = gen.generate(sim_dir, profiles, groups, force=force, progress_callback=_rel_progress)
 
         return jsonify({
             "success": True,

@@ -9,7 +9,7 @@ Results are cached to relationships_ai.json in the simulation dir.
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 from openai import AzureOpenAI
 
@@ -49,8 +49,13 @@ class RelationshipGenerator:
         profiles: List[Dict[str, Any]],
         groups: List[Dict[str, Any]],
         force: bool = False,
+        progress_callback: Optional[Callable[[int, int, int], None]] = None,
     ) -> List[Dict[str, Any]]:
-        """Return edges [{src_id, tgt_id, type, label}]. Cached unless force=True."""
+        """Return edges [{src_id, tgt_id, type, label}]. Cached unless force=True.
+
+        progress_callback(agent_current, agent_total, relationship_count) is called
+        after each agent completes its negotiation loop.
+        """
         cache_path = os.path.join(simulation_dir, "relationships_ai.json")
         if not force and os.path.exists(cache_path):
             try:
@@ -68,7 +73,7 @@ class RelationshipGenerator:
             )
             return []
 
-        edges = self._negotiate_all(profiles, groups)
+        edges = self._negotiate_all(profiles, groups, progress_callback=progress_callback)
 
         try:
             with open(cache_path, "w", encoding="utf-8") as f:
@@ -264,6 +269,7 @@ class RelationshipGenerator:
         self,
         profiles: List[Dict[str, Any]],
         groups: List[Dict[str, Any]],
+        progress_callback: Optional[Callable[[int, int, int], None]] = None,
     ) -> List[Dict[str, Any]]:
         """Iterate agents sequentially; each runs its own agentic loop."""
         profiles_sorted = sorted(profiles, key=lambda p: p.get("user_id", p.get("id", 0)))
@@ -271,8 +277,9 @@ class RelationshipGenerator:
 
         shared_graph: List[Dict] = []
         failed = 0
+        total = len(profiles_sorted)
 
-        for profile in profiles_sorted:
+        for idx, profile in enumerate(profiles_sorted):
             uid = profile.get("user_id", profile.get("id"))
             username = profile.get("username", profile.get("user_name", f"agent_{uid}"))
             logger.info(f"Negotiating relationships for agent {uid} ({username})")
@@ -292,6 +299,12 @@ class RelationshipGenerator:
             except Exception as e:
                 failed += 1
                 logger.warning(f"Agent {uid} loop failed: {e}")
+
+            if progress_callback:
+                try:
+                    progress_callback(idx + 1, total, len(shared_graph))
+                except Exception:
+                    pass
 
         total = len(profiles_sorted)
         if total > 0 and failed / total > FAILURE_THRESHOLD:

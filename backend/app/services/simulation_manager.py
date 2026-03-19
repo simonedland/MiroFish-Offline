@@ -82,6 +82,9 @@ class SimulationState:
     total_agents: int = 0  # set from ScenarioDefinition.total_agents; 0 in document flow
     config_batch_current: int = 0  # current config-gen batch (description flow)
     config_batch_total: int = 0    # total config-gen batches (description flow)
+    relationship_agent_current: int = 0  # agents processed so far in relationship generation
+    relationship_agent_total: int = 0    # total agents to process
+    relationship_count: int = 0          # total relationships declared so far
 
     def to_dict(self) -> Dict[str, Any]:
         """Complete status dict (internal use)"""
@@ -108,6 +111,9 @@ class SimulationState:
             "scenario_definition": self.scenario_definition,
             "config_batch_current": self.config_batch_current,
             "config_batch_total": self.config_batch_total,
+            "relationship_agent_current": self.relationship_agent_current,
+            "relationship_agent_total": self.relationship_agent_total,
+            "relationship_count": self.relationship_count,
         }
 
     def to_simple_dict(self) -> Dict[str, Any]:
@@ -125,6 +131,9 @@ class SimulationState:
             "total_agents": self.total_agents,
             "config_batch_current": self.config_batch_current,
             "config_batch_total": self.config_batch_total,
+            "relationship_agent_current": self.relationship_agent_current,
+            "relationship_agent_total": self.relationship_agent_total,
+            "relationship_count": self.relationship_count,
         }
 
 
@@ -207,6 +216,9 @@ class SimulationManager:
             scenario_definition=data.get("scenario_definition"),
             config_batch_current=data.get("config_batch_current", 0),
             config_batch_total=data.get("config_batch_total", 0),
+            relationship_agent_current=data.get("relationship_agent_current", 0),
+            relationship_agent_total=data.get("relationship_agent_total", 0),
+            relationship_count=data.get("relationship_count", 0),
         )
         
         self._simulations[simulation_id] = state
