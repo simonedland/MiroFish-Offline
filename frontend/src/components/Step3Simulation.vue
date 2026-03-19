@@ -138,7 +138,7 @@
               <div class="marker-dot"></div>
             </div>
             
-            <div class="timeline-card">
+            <div class="timeline-card" @click="selectedAction = action" style="cursor:pointer;">
               <div class="card-header">
                 <div class="agent-info">
                   <div class="avatar-placeholder">{{ (action.agent_name || 'A')[0] }}</div>
@@ -269,6 +269,56 @@
       </div>
     </div>
 
+    <!-- Message Detail Modal -->
+    <Transition name="modal-fade">
+      <div v-if="selectedAction" class="modal-overlay" @click.self="selectedAction = null">
+        <div class="modal-panel">
+          <div class="modal-header">
+            <div class="modal-title">
+              <div class="avatar-placeholder large">{{ (selectedAction.agent_name || 'A')[0] }}</div>
+              <div class="modal-agent-info">
+                <span class="modal-agent-name">{{ selectedAction.agent_name }}</span>
+                <span class="action-badge" :class="getActionTypeClass(selectedAction.action_type)">{{ getActionTypeLabel(selectedAction.action_type) }}</span>
+              </div>
+            </div>
+            <button class="modal-close" @click="selectedAction = null">✕</button>
+          </div>
+
+          <div class="modal-body">
+            <!-- FROM row -->
+            <div class="detail-row">
+              <span class="detail-label">FROM</span>
+              <span class="detail-value mono">{{ selectedAction.agent_name || '—' }}</span>
+            </div>
+
+            <!-- TO row (varies by action type) -->
+            <div class="detail-row" v-if="getActionTarget(selectedAction)">
+              <span class="detail-label">TO</span>
+              <span class="detail-value mono">{{ getActionTarget(selectedAction) }}</span>
+            </div>
+
+            <!-- Platform + Round + Time -->
+            <div class="detail-row">
+              <span class="detail-label">WHEN</span>
+              <span class="detail-value mono">R{{ selectedAction.round_num }} · {{ formatActionTime(selectedAction.timestamp) }} · {{ selectedAction.platform === 'twitter' ? 'Info Plaza' : 'Topic Community' }}</span>
+            </div>
+
+            <!-- Main content -->
+            <div class="detail-content" v-if="getActionContent(selectedAction)">
+              <div class="detail-content-label">MESSAGE</div>
+              <div class="detail-content-text">{{ getActionContent(selectedAction) }}</div>
+            </div>
+
+            <!-- Quoted / original content -->
+            <div class="detail-content quoted" v-if="selectedAction.action_args?.original_content">
+              <div class="detail-content-label">ORIGINAL</div>
+              <div class="detail-content-text">{{ selectedAction.action_args.original_content }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <!-- Bottom Info / Logs -->
     <div class="system-logs">
       <div class="log-header">
@@ -313,6 +363,7 @@ const emit = defineEmits(['go-back', 'next-step', 'add-log', 'update-status'])
 const router = useRouter()
 
 // State
+const selectedAction = ref(null)
 const isGeneratingReport = ref(false)
 const phase = ref(0) // 0: Not started, 1: Running, 2: Completed
 const isStarting = ref(false)
@@ -630,6 +681,33 @@ const truncateContent = (content, maxLength = 100) => {
   if (!content) return ''
   if (content.length > maxLength) return content.substring(0, maxLength) + '...'
   return content
+}
+
+// Return the "to" target of an action (who/what it is directed at)
+const getActionTarget = (action) => {
+  const a = action.action_args || {}
+  if (action.action_type === 'LIKE_POST') return a.post_author_name ? `@${a.post_author_name}` : null
+  if (action.action_type === 'LIKE_COMMENT') return a.comment_author_name ? `@${a.comment_author_name}` : null
+  if (action.action_type === 'REPOST') return a.original_author_name ? `@${a.original_author_name}` : null
+  if (action.action_type === 'QUOTE_POST') return a.original_author_name ? `@${a.original_author_name}` : null
+  if (action.action_type === 'FOLLOW') return a.target_user_name ? `@${a.target_user_name}` : (a.target_user ? `@${a.target_user}` : null)
+  if (action.action_type === 'CREATE_COMMENT') return a.post_id ? `Post #${a.post_id}` : null
+  if (action.action_type === 'UPVOTE_POST' || action.action_type === 'DOWNVOTE_POST') return a.post_id ? `Post #${a.post_id}` : null
+  return null
+}
+
+// Return the primary text content of an action
+const getActionContent = (action) => {
+  const a = action.action_args || {}
+  if (action.action_type === 'CREATE_POST') return a.content || null
+  if (action.action_type === 'CREATE_COMMENT') return a.content || null
+  if (action.action_type === 'QUOTE_POST') return a.quote_content || null
+  if (action.action_type === 'LIKE_POST') return a.post_content || null
+  if (action.action_type === 'LIKE_COMMENT') return a.comment_content || null
+  if (action.action_type === 'REPOST') return a.original_content || null
+  if (action.action_type === 'UPVOTE_POST' || action.action_type === 'DOWNVOTE_POST') return a.post_content || null
+  if (action.action_type === 'SEARCH_POSTS') return a.query ? `"${a.query}"` : null
+  return a.content || null
 }
 
 const formatActionTime = (timestamp) => {
@@ -1264,4 +1342,133 @@ onUnmounted(() => {
   animation: spin 0.8s linear infinite;
   margin-right: 6px;
 }
+
+/* ── Message Detail Modal ───────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-panel {
+  background: #fff;
+  border: 1.5px solid #000;
+  width: 480px;
+  max-width: 92vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  font-family: inherit;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1.5px solid #000;
+}
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar-placeholder.large {
+  width: 36px;
+  height: 36px;
+  font-size: 15px;
+}
+
+.modal-agent-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-agent-name {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.modal-close {
+  background: none;
+  border: 1.5px solid #000;
+  cursor: pointer;
+  font-size: 12px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.modal-close:hover { background: #000; color: #fff; }
+
+.modal-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detail-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.detail-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  color: #666;
+  min-width: 44px;
+}
+
+.detail-value {
+  color: #000;
+}
+
+.detail-content {
+  border: 1.5px solid #000;
+  padding: 10px 12px;
+  margin-top: 4px;
+}
+
+.detail-content.quoted {
+  border-color: #666;
+  background: #f5f5f5;
+}
+
+.detail-content-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.detail-content-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #000;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Modal transitions */
+.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.15s ease; }
+.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 </style>

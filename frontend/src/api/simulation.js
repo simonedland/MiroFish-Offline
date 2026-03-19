@@ -193,3 +193,12 @@ export const deleteSimulation = (simulationId) => {
   return service.delete(`/api/simulation/${simulationId}`)
 }
 
+/**
+ * Generate AI relationships for a simulation
+ * @param {string} simulationId
+ * @param {boolean} force - regenerate even if cached
+ */
+export const getSimulationRelationships = (simulationId, force = false) => {
+  return service.get(`/api/simulation/${simulationId}/relationships`, { params: { force } })
+}
+

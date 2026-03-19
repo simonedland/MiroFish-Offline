@@ -13,6 +13,7 @@ from ..services.entity_reader import EntityReader
 from ..services.oasis_profile_generator import OasisProfileGenerator
 from ..services.simulation_manager import SimulationManager, SimulationStatus
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
+from ..services.relationship_generator import RelationshipGenerator
 from ..utils.logger import get_logger
 from ..models.project import ProjectManager
 
@@ -799,6 +800,82 @@ def list_simulations():
         
     except Exception as e:
         logger.error(f"Failed to list simulations: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@simulation_bp.route('/<simulation_id>/relationships', methods=['GET'])
+def get_simulation_relationships(simulation_id: str):
+    """
+    Generate (or load from cache) AI-driven agent relationships for a simulation.
+
+    Query parameters:
+        force: set to 'true' to regenerate even if cached (default false)
+
+    Returns:
+        {
+            "success": true,
+            "data": {
+                "edges": [{src_id, tgt_id, type, label}, ...],
+                "count": N
+            }
+        }
+    """
+    import json as _json
+
+    try:
+        force = request.args.get('force', 'false').lower() == 'true'
+
+        manager = SimulationManager()
+        state = manager.get_simulation(simulation_id)
+        if not state:
+            return jsonify({
+                "success": False,
+                "error": f"Simulation does not exist: {simulation_id}"
+            }), 404
+
+        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
+
+        # Load profiles
+        profiles_path = os.path.join(sim_dir, "reddit_profiles.json")
+        if not os.path.exists(profiles_path):
+            return jsonify({
+                "success": False,
+                "error": "reddit_profiles.json not found — run prepare first"
+            }), 404
+
+        with open(profiles_path, "r", encoding="utf-8") as f:
+            profiles = _json.load(f)
+        if not isinstance(profiles, list):
+            profiles = []
+
+        # Load groups from scenario_definition.json
+        groups = []
+        scenario_path = os.path.join(sim_dir, "scenario_definition.json")
+        if os.path.exists(scenario_path):
+            try:
+                with open(scenario_path, "r", encoding="utf-8") as f:
+                    scenario = _json.load(f)
+                groups = scenario.get("groups", [])
+            except Exception as e:
+                logger.warning(f"Could not read scenario_definition.json: {e}")
+
+        gen = RelationshipGenerator()
+        edges = gen.generate(sim_dir, profiles, groups, force=force)
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "edges": edges,
+                "count": len(edges),
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to generate relationships for {simulation_id}: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e),

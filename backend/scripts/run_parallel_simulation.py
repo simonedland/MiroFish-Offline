@@ -1313,7 +1313,33 @@ async def run_reddit_simulation(
     if not os.path.exists(profile_path):
         log_info(f"Error: Profile file does not exist: {profile_path}")
         return result
-    
+
+    # OASIS accesses mbti/age/gender/country via direct dict lookup (no .get()).
+    # Patch the file to ensure all required fields are present with safe defaults.
+    try:
+        with open(profile_path, 'r', encoding='utf-8') as f:
+            _profiles = json.load(f)
+        _patched = False
+        for _p in _profiles:
+            if "mbti" not in _p:
+                _p["mbti"] = "ISTJ"
+                _patched = True
+            if "age" not in _p:
+                _p["age"] = 30
+                _patched = True
+            if "gender" not in _p:
+                _p["gender"] = "other"
+                _patched = True
+            if "country" not in _p:
+                _p["country"] = "US"
+                _patched = True
+        if _patched:
+            with open(profile_path, 'w', encoding='utf-8') as f:
+                json.dump(_profiles, f, ensure_ascii=False, indent=2)
+            log_info("Patched reddit_profiles.json: filled in missing required fields")
+    except Exception as _e:
+        log_info(f"Warning: Could not patch profiles: {_e}")
+
     result.agent_graph = await generate_reddit_agent_graph(
         profile_path=profile_path,
         model=model,

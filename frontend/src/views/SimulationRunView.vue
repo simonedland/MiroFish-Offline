@@ -74,7 +74,7 @@ import { useRoute, useRouter } from 'vue-router'
 import GraphPanel from '../components/GraphPanel.vue'
 import Step3Simulation from '../components/Step3Simulation.vue'
 import { getProject, getGraphData } from '../api/graph'
-import { getSimulation, getSimulationConfig, getSimulationProfiles, getSimulationActions, getRunStatusDetail, stopSimulation, closeSimulationEnv, getEnvStatus } from '../api/simulation'
+import { getSimulation, getSimulationConfig, getSimulationProfiles, getSimulationActions, getRunStatusDetail, stopSimulation, closeSimulationEnv, getEnvStatus, getSimulationRelationships } from '../api/simulation'
 import { getSimulationGroups } from '../api/scenario'
 
 const route = useRoute()
@@ -354,7 +354,7 @@ const buildAgentGraph = async () => {
     const edgeSet = new Set()
     const edges   = []
 
-    const addEdge = (srcId, tgtId, type) => {
+    const addEdge = (srcId, tgtId, type, label) => {
       if (srcId === tgtId) return
       const key = `${srcId}_${tgtId}_${type}`
       if (edgeSet.has(key)) return
@@ -363,7 +363,7 @@ const buildAgentGraph = async () => {
         source_node_uuid: `agent_${srcId}`,
         target_node_uuid: `agent_${tgtId}`,
         relationship_type: type,
-        name: type,
+        name: label || type,
       })
     }
 
@@ -394,7 +394,19 @@ const buildAgentGraph = async () => {
       })
     })
 
-    // 2. Actual actions from the simulation run
+    // 2. AI-generated relationships
+    try {
+      const relRes = await getSimulationRelationships(currentSimulationId.value)
+      const aiEdges = relRes.data?.edges || []
+      aiEdges.forEach(e => {
+        addEdge(e.src_id, e.tgt_id, e.type, e.label)
+      })
+      addLog(`AI relationships: ${aiEdges.length} edges`)
+    } catch (err) {
+      addLog(`AI relationships skipped: ${err.message}`)
+    }
+
+    // 3. Actual actions from the simulation run
     actions.forEach(a => {
       const srcId = a.agent_id
       const args  = a.action_args || {}

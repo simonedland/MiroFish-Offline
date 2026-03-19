@@ -488,10 +488,11 @@ class SimulationRunner:
         
         process = cls._processes.get(simulation_id)
         state = cls.get_run_state(simulation_id)
-        
+
         if not process or not state:
             return
-        
+
+        monitored_pid = process.pid  # Remember which process we own
         twitter_position = 0
         reddit_position = 0
         
@@ -519,30 +520,33 @@ class SimulationRunner:
             if os.path.exists(reddit_actions_log):
                 cls._read_action_log(reddit_actions_log, reddit_position, state, "reddit")
             
-            # Process ended
+            # Process ended — only update state if we still own this simulation
             exit_code = process.returncode
-            
-            if exit_code == 0:
-                state.runner_status = RunnerStatus.COMPLETED
-                state.completed_at = datetime.now().isoformat()
-                logger.info(f"Simulation completed: {simulation_id}")
+            current_process = cls._processes.get(simulation_id)
+            if current_process is None or current_process.pid == monitored_pid:
+                if exit_code == 0:
+                    state.runner_status = RunnerStatus.COMPLETED
+                    state.completed_at = datetime.now().isoformat()
+                    logger.info(f"Simulation completed: {simulation_id}")
+                else:
+                    state.runner_status = RunnerStatus.FAILED
+                    # Read error info from main log file
+                    main_log_path = os.path.join(sim_dir, "simulation.log")
+                    error_info = ""
+                    try:
+                        if os.path.exists(main_log_path):
+                            with open(main_log_path, 'r', encoding='utf-8') as f:
+                                error_info = f.read()[-2000:]  # Take last 2000 characters
+                    except Exception:
+                        pass
+                    state.error = f"Process exit code: {exit_code}, error: {error_info}"
+                    logger.error(f"Simulation failed: {simulation_id}, error={state.error}")
+
+                state.twitter_running = False
+                state.reddit_running = False
+                cls._save_run_state(state)
             else:
-                state.runner_status = RunnerStatus.FAILED
-                # Read error info from main log file
-                main_log_path = os.path.join(sim_dir, "simulation.log")
-                error_info = ""
-                try:
-                    if os.path.exists(main_log_path):
-                        with open(main_log_path, 'r', encoding='utf-8') as f:
-                            error_info = f.read()[-2000:]  # Take last 2000 characters
-                except Exception:
-                    pass
-                state.error = f"Process exit code: {exit_code}, error: {error_info}"
-                logger.error(f"Simulation failed: {simulation_id}, error={state.error}")
-            
-            state.twitter_running = False
-            state.reddit_running = False
-            cls._save_run_state(state)
+                logger.info(f"Monitor thread for pid={monitored_pid} exiting silently — simulation {simulation_id} already restarted as pid={current_process.pid}")
             
         except Exception as e:
             logger.error(f"Monitor thread exception: {simulation_id}, error={str(e)}")
@@ -551,32 +555,35 @@ class SimulationRunner:
             cls._save_run_state(state)
         
         finally:
-            # Stop graph memory updater
-            if cls._graph_memory_enabled.get(simulation_id, False):
-                try:
-                    GraphMemoryManager.stop_updater(simulation_id)
-                    logger.info(f"Graph memory update stopped: simulation_id={simulation_id}")
-                except Exception as e:
-                    logger.error(f"Failed to stop graph memory updater: {e}")
-                cls._graph_memory_enabled.pop(simulation_id, None)
-            
-            # Clean up process resources
-            cls._processes.pop(simulation_id, None)
-            cls._action_queues.pop(simulation_id, None)
-            
-            # Close log file handle
-            if simulation_id in cls._stdout_files:
-                try:
-                    cls._stdout_files[simulation_id].close()
-                except Exception:
-                    pass
-                cls._stdout_files.pop(simulation_id, None)
-            if simulation_id in cls._stderr_files and cls._stderr_files[simulation_id]:
-                try:
-                    cls._stderr_files[simulation_id].close()
-                except Exception:
-                    pass
-                cls._stderr_files.pop(simulation_id, None)
+            # Only release resources if we still own this simulation (guard against restart race)
+            current_process = cls._processes.get(simulation_id)
+            if current_process is None or current_process.pid == monitored_pid:
+                # Stop graph memory updater
+                if cls._graph_memory_enabled.get(simulation_id, False):
+                    try:
+                        GraphMemoryManager.stop_updater(simulation_id)
+                        logger.info(f"Graph memory update stopped: simulation_id={simulation_id}")
+                    except Exception as e:
+                        logger.error(f"Failed to stop graph memory updater: {e}")
+                    cls._graph_memory_enabled.pop(simulation_id, None)
+
+                # Clean up process resources
+                cls._processes.pop(simulation_id, None)
+                cls._action_queues.pop(simulation_id, None)
+
+                # Close log file handle
+                if simulation_id in cls._stdout_files:
+                    try:
+                        cls._stdout_files[simulation_id].close()
+                    except Exception:
+                        pass
+                    cls._stdout_files.pop(simulation_id, None)
+                if simulation_id in cls._stderr_files and cls._stderr_files[simulation_id]:
+                    try:
+                        cls._stderr_files[simulation_id].close()
+                    except Exception:
+                        pass
+                    cls._stderr_files.pop(simulation_id, None)
     
     @classmethod
     def _read_action_log(
@@ -785,7 +792,7 @@ class SimulationRunner:
         cls._save_run_state(state)
         
         # Terminate process
-        process = cls._processes.get(simulation_id)
+        process = cls._processes.pop(simulation_id, None)  # Remove immediately so new starts are clean
         if process and process.poll() is None:
             try:
                 cls._terminate_process(process, simulation_id)

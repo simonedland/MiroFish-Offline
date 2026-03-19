@@ -949,29 +949,77 @@ function pulseNode(uuid) {
     .transition().duration(500).ease(d3.easeElasticOut).attr('r', 10)
 }
 
+function pulseNodeSoft(uuid) {
+  const el = nodeByUuid[uuid]
+  if (!el) return
+  d3.select(el)
+    .transition().duration(200).attr('r', 15)
+    .transition().duration(400).ease(d3.easeElasticOut).attr('r', 10)
+}
+
 function animateDot(srcId, tgtId) {
+  if (!svgG) return
   const pathEl = edgeByPair[`${srcId}_${tgtId}`] || edgeByPair[`${tgtId}_${srcId}`]
-  if (!pathEl || !svgG) return
-  const total = pathEl.getTotalLength()
-  if (!total) return
+  let pathNode = pathEl
+  let tempPath = null
+
+  if (!pathEl) {
+    // No static edge — draw a temporary arc between the two node positions
+    const srcEl = nodeByUuid[srcId]
+    const tgtEl = nodeByUuid[tgtId]
+    if (!srcEl || !tgtEl) return
+    const srcD = d3.select(srcEl).datum()
+    const tgtD = d3.select(tgtEl).datum()
+    if (!srcD || !tgtD) return
+    const sx = srcD.x, sy = srcD.y, tx = tgtD.x, ty = tgtD.y
+    const dx = tx - sx, dy = ty - sy
+    const len = Math.sqrt(dx * dx + dy * dy) || 1
+    const offset = Math.min(len * 0.3, 60)
+    const cx = (sx + tx) / 2 - (dy / len) * offset
+    const cy = (sy + ty) / 2 + (dx / len) * offset
+    tempPath = d3.select(svgG).append('path')
+      .attr('d', `M${sx},${sy} Q${cx},${cy} ${tx},${ty}`)
+      .attr('stroke', '#e8642a')
+      .attr('stroke-width', 1.5)
+      .attr('fill', 'none')
+      .attr('opacity', 0.35)
+      .attr('pointer-events', 'none')
+    pathNode = tempPath.node()
+  }
+
+  const total = pathNode.getTotalLength()
+  if (!total) {
+    if (tempPath) tempPath.remove()
+    return
+  }
+
   const dot = d3.select(svgG).append('circle')
     .attr('r', 5)
     .attr('fill', '#e8642a')
     .attr('pointer-events', 'none')
     .attr('opacity', 0.85)
+
   dot.transition()
     .duration(700)
     .ease(d3.easeLinear)
-    .attrTween('cx', () => t => pathEl.getPointAtLength(t * total).x)
-    .attrTween('cy', () => t => pathEl.getPointAtLength(t * total).y)
-    .on('end', () => dot.remove())
+    .attrTween('cx', () => t => pathNode.getPointAtLength(t * total).x)
+    .attrTween('cy', () => t => pathNode.getPointAtLength(t * total).y)
+    .on('end', () => {
+      dot.remove()
+      if (tempPath) {
+        tempPath.transition().duration(300).attr('opacity', 0).on('end', () => tempPath.remove())
+      }
+    })
 }
 
 watch(() => props.recentActions, (actions) => {
   if (!actions?.length) return
   actions.forEach(a => {
     if (a.srcId) pulseNode(a.srcId)
-    if (a.srcId && a.tgtId) animateDot(a.srcId, a.tgtId)
+    if (a.srcId && a.tgtId) {
+      animateDot(a.srcId, a.tgtId)
+      pulseNodeSoft(a.tgtId)
+    }
   })
 }, { deep: true })
 
