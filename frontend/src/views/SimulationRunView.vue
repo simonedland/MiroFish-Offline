@@ -97,7 +97,7 @@ const props = defineProps({
 })
 
 // Layout State
-const viewMode = ref('split')
+const viewMode = ref('sms')
 
 // Data State
 const currentSimulationId = ref(route.params.simulationId)
