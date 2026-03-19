@@ -108,6 +108,8 @@ class SmsSimulationRunner:
         self._phone_to_profile: dict = {p.phone_number: p for p in profiles if p.phone_number}
         self._id_to_profile: dict = {p.user_id: p for p in profiles}
 
+        self._db_lock = asyncio.Lock()
+
         # Azure OpenAI client (lazy init in async context)
         self._llm_client: Optional[AsyncAzureOpenAI] = None
         self._deployment: str = os.environ.get("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-4o")
@@ -174,8 +176,9 @@ class SmsSimulationRunner:
                     content=result.send_message,
                     round_num=round_num,
                 )
-                insert_message(self.simulation_id, msg.to_dict())
-                _emit_event(self.simulation_id, "sms_message", msg.to_dict())
+                async with self._db_lock:
+                    insert_message(self.simulation_id, msg.to_dict())
+                    _emit_event(self.simulation_id, "sms_message", msg.to_dict())
 
             if not result.continue_conversation:
                 break

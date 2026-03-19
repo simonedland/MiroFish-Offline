@@ -1594,7 +1594,8 @@ def start_simulation():
         # SMS simulation mode: short-circuit to dedicated runner
         if simulation_mode == 'sms':
             manager = SimulationManager()
-            result = manager.start_sms_simulation(simulation_id)
+            max_rounds = data.get("max_rounds")
+            result = manager.start_sms_simulation(simulation_id, max_rounds=max_rounds)
             return jsonify({"success": True, "data": result})
 
         # Verify max_rounds Parameters

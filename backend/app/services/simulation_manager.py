@@ -661,7 +661,7 @@ class SimulationManager:
             state.error = str(exc)
             self._save_simulation_state(state)
 
-    def start_sms_simulation(self, simulation_id: str) -> dict:
+    def start_sms_simulation(self, simulation_id: str, max_rounds: int = None) -> dict:
         """Start an SMS-mode simulation as a background thread."""
         import threading
         import asyncio
@@ -716,6 +716,8 @@ class SimulationManager:
                 config = _json.load(f)
 
         total_rounds = config.get("max_rounds") or config.get("total_rounds") or 10
+        if max_rounds is not None:
+            total_rounds = int(max_rounds)
 
         # Init SMS DB
         init_db(simulation_id)

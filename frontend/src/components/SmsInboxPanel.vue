@@ -17,9 +17,9 @@
       <div class="sms-sidebar-title">Conversations</div>
       <div
         v-for="contact in contacts"
-        :key="contact.phone"
+        :key="contact.other_phone"
         class="sms-contact-item"
-        :class="{ active: selectedContact && selectedContact.phone === contact.phone }"
+        :class="{ active: selectedContact && selectedContact.other_phone === contact.other_phone }"
         @click="selectContact(contact)"
       >
         <div class="contact-name">{{ contact.other_name }}</div>
