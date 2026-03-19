@@ -262,8 +262,7 @@ class TestAgenticLoop:
         mock_azure.return_value.chat.completions.create.side_effect = [
             _make_tool_call_response("declare_relationship", {"tgt_id": 1, "type": "FOLLOWS", "label": "follows bob"}),
             _make_finish_response(),
-            # remaining agents also immediately finish
-            _make_finish_response(),
+            # agent 1 finishes immediately
             _make_finish_response(),
         ]
         gen = self._make_generator(mock_azure)
@@ -275,32 +274,75 @@ class TestAgenticLoop:
     # Staged edges not visible mid-loop via get_full_graph ---------------
 
     def test_agent_staged_edges_not_in_graph_during_loop(self, mock_azure, tmp_path):
-        captured_graph_responses = []
+        """
+        Invariant 1: An agent cannot see its own staged edges via get_full_graph mid-loop.
+        Invariant 2: A later agent CAN see edges committed by previous agents.
+        """
+        call_count = [0]
+        graph_snapshots = []  # captures what get_full_graph returned at each call
 
         def side_effect(*args, **kwargs):
-            messages = kwargs.get("messages", args[1] if len(args) > 1 else [])
-            # Check if any tool result for get_full_graph is in the history
-            for m in messages:
-                if m.get("role") == "tool" and m.get("content", "").startswith("["):
-                    captured_graph_responses.append(json.loads(m["content"]))
-            # Turn 1 for agent 0: declare, then finish
-            call_count = mock_azure.return_value.chat.completions.create.call_count
-            if call_count == 1:
-                return _make_tool_call_response("declare_relationship", {"tgt_id": 1, "type": "FOLLOWS", "label": "test"})
-            if call_count == 2:
+            call_count[0] += 1
+            n = call_count[0]
+            # Agent 0, turn 1: get_full_graph (should see empty graph — no prior agents)
+            if n == 1:
+                return _make_tool_call_response("get_full_graph", {}, call_id="call_g0_t1")
+            # Agent 0, turn 2: declare a relationship, then finish
+            if n == 2:
+                return _make_tool_call_response(
+                    "declare_relationship",
+                    {"tgt_id": 1, "type": "FOLLOWS", "label": "test"},
+                    call_id="call_g0_t2",
+                )
+            if n == 3:
+                # Agent 0, turn 3: get_full_graph again BEFORE finishing
+                # Should still see empty graph — own staged edge not committed yet
+                return _make_tool_call_response("get_full_graph", {}, call_id="call_g0_t3")
+            if n == 4:
+                # Agent 0 finishes
                 return _make_finish_response()
-            # Agent 1: get_full_graph, then finish
-            if call_count == 3:
-                return _make_tool_call_response("get_full_graph", {})
+            # Agent 1, turn 1: get_full_graph (should see agent 0's committed edge)
+            if n == 5:
+                return _make_tool_call_response("get_full_graph", {}, call_id="call_g1_t1")
+            # Agent 1 finishes
             return _make_finish_response()
 
-        mock_azure.return_value.chat.completions.create.side_effect = side_effect
+        # Capture graph snapshots by intercepting only the NEWEST tool message on each call.
+        # Each LLM call appends exactly one new tool message to history (the result from the
+        # previous turn's tool call). We track seen tool_call_ids to avoid re-counting older
+        # messages that are replayed in full each time.
+        seen_tool_call_ids: set = set()
+        original_side_effect = side_effect
+
+        def capturing_side_effect(*args, **kwargs):
+            messages = kwargs.get("messages", [])
+            for m in messages:
+                if m.get("role") == "tool" and m.get("content", "").startswith("["):
+                    tcid = m.get("tool_call_id", "")
+                    if tcid not in seen_tool_call_ids:
+                        seen_tool_call_ids.add(tcid)
+                        graph_snapshots.append(json.loads(m["content"]))
+            return original_side_effect(*args, **kwargs)
+
+        mock_azure.return_value.chat.completions.create.side_effect = capturing_side_effect
         gen = self._make_generator(mock_azure)
         gen.generate(str(tmp_path), PROFILES[:2], GROUPS, force=True)
 
-        # Agent 1's get_full_graph should see agent 0's committed edge
-        assert any(len(g) == 1 for g in captured_graph_responses), \
-            "Agent 1 should see agent 0's committed edge via get_full_graph"
+        # Snapshots arrive in declaration order:
+        # snapshot[0] = agent 0's first get_full_graph  → must be empty (no prior agents)
+        # snapshot[1] = agent 0's second get_full_graph → must be empty (staged, not committed)
+        # snapshot[2] = agent 1's get_full_graph        → must have 1 edge (agent 0's committed edge)
+        assert len(graph_snapshots) >= 3, \
+            f"Expected 3 graph snapshots, got {len(graph_snapshots)}: {graph_snapshots}"
+
+        assert graph_snapshots[0] == [], \
+            f"Agent 0's first get_full_graph should be empty (no prior agents), got {graph_snapshots[0]}"
+
+        assert graph_snapshots[1] == [], \
+            f"Agent 0's second get_full_graph should be empty (staged edge not committed), got {graph_snapshots[1]}"
+
+        assert len(graph_snapshots[2]) == 1, \
+            f"Agent 1 should see agent 0's committed edge, got {graph_snapshots[2]}"
 
     # Max-turn guard flushes staged edges --------------------------------
 

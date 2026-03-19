@@ -9,7 +9,7 @@ Results are cached to relationships_ai.json in the simulation dir.
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from openai import AzureOpenAI
 
@@ -198,7 +198,7 @@ class RelationshipGenerator:
         Run the agentic loop for a single agent.
         Returns the list of edges staged (flushed on clean exit or max-turn; discarded on exception).
         """
-        src_id = profile.get("user_id", profile.get("id"))
+        src_id = profile.get("user_id", profile.get("id", 0))
         group_id = profile.get("group_id", "")
         matched = next((g for g in groups if g.get("name") == group_id), None)
         group_name = matched["name"] if matched else group_id
