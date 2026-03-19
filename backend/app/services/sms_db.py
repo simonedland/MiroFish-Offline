@@ -4,6 +4,8 @@ import time
 from typing import Optional
 
 def _get_db_path(simulation_id: str) -> str:
+    if not simulation_id or '..' in simulation_id or '/' in simulation_id or '\\' in simulation_id:
+        raise ValueError(f"Invalid simulation_id: {simulation_id!r}")
     sim_dir = os.path.join("uploads", "simulations", simulation_id)
     os.makedirs(sim_dir, exist_ok=True)
     return os.path.join(sim_dir, "sms.db")
@@ -109,7 +111,7 @@ def get_thread(simulation_id: str, phone_a: str, phone_b: str, limit: int = 20) 
         conn.close()
 
 def get_all_threads_for_agent(simulation_id: str, phone: str) -> list:
-    """Get all conversation partners for a given phone number."""
+    """Get all conversation partners for a given phone number with last message."""
     db_path = _get_db_path(simulation_id)
     if not os.path.exists(db_path):
         return []
@@ -117,18 +119,32 @@ def get_all_threads_for_agent(simulation_id: str, phone: str) -> list:
     conn.row_factory = sqlite3.Row
     try:
         cursor = conn.cursor()
+        # Get distinct partners
         cursor.execute(
             """SELECT
                 CASE WHEN sender_phone = ? THEN receiver_phone ELSE sender_phone END as other_phone,
                 CASE WHEN sender_phone = ? THEN receiver_name ELSE sender_name END as other_name,
                 COUNT(*) as message_count,
-                MAX(content) as last_message
+                MAX(timestamp) as last_timestamp
                FROM sms_messages
                WHERE simulation_id = ? AND (sender_phone = ? OR receiver_phone = ?)
                GROUP BY other_phone""",
             (phone, phone, simulation_id, phone, phone)
         )
-        return [dict(row) for row in cursor.fetchall()]
+        rows = [dict(row) for row in cursor.fetchall()]
+        # Fetch last message content for each partner
+        for row in rows:
+            cursor.execute(
+                """SELECT content FROM sms_messages
+                   WHERE simulation_id = ?
+                     AND ((sender_phone = ? AND receiver_phone = ?)
+                          OR (sender_phone = ? AND receiver_phone = ?))
+                   ORDER BY timestamp DESC LIMIT 1""",
+                (simulation_id, phone, row['other_phone'], row['other_phone'], phone)
+            )
+            result = cursor.fetchone()
+            row['last_message'] = result['content'] if result else ''
+        return rows
     finally:
         conn.close()
 
