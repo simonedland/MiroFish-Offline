@@ -8,14 +8,14 @@
       
       <div class="header-center">
         <div class="view-switcher">
-          <button 
-            v-for="mode in ['graph', 'split', 'workbench']" 
+          <button
+            v-for="mode in ['graph', 'split', 'workbench', 'sms']"
             :key="mode"
             class="switch-btn"
             :class="{ active: viewMode === mode }"
             @click="viewMode = mode"
           >
-            {{ { graph: 'Graph', split: 'Split', workbench: 'Workbench' }[mode] }}
+            {{ { graph: 'Graph', split: 'Split', workbench: 'Workbench', sms: 'SMS Inbox' }[mode] }}
           </button>
         </div>
       </div>
@@ -35,35 +35,45 @@
 
     <!-- Main Content Area -->
     <main class="content-area">
-      <!-- Left Panel: Graph -->
-      <div class="panel-wrapper left" :style="leftPanelStyle">
-        <GraphPanel
-          :graphData="graphData"
-          :loading="graphLoading"
-          :currentPhase="3"
-          :isSimulating="isSimulating"
-          :clustered="isDescriptionFlow"
-          :recentActions="latestActions"
-          @refresh="refreshGraph"
-          @toggle-maximize="toggleMaximize('graph')"
+      <!-- SMS Inbox Panel -->
+      <div v-if="viewMode === 'sms'" class="panel-wrapper sms-full">
+        <SmsInboxPanel
+          :simulation-id="currentSimulationId"
+          :is-running="isSimulating"
         />
       </div>
 
-      <!-- Right Panel: Step3 Simulation -->
-      <div class="panel-wrapper right" :style="rightPanelStyle">
-        <Step3Simulation
-          :simulationId="currentSimulationId"
-          :maxRounds="maxRounds"
-          :minutesPerRound="minutesPerRound"
-          :projectData="projectData"
-          :graphData="graphData"
-          :systemLogs="systemLogs"
-          @go-back="handleGoBack"
-          @next-step="handleNextStep"
-          @add-log="addLog"
-          @update-status="updateStatus"
-        />
-      </div>
+      <template v-else>
+        <!-- Left Panel: Graph -->
+        <div class="panel-wrapper left" :style="leftPanelStyle">
+          <GraphPanel
+            :graphData="graphData"
+            :loading="graphLoading"
+            :currentPhase="3"
+            :isSimulating="isSimulating"
+            :clustered="isDescriptionFlow"
+            :recentActions="latestActions"
+            @refresh="refreshGraph"
+            @toggle-maximize="toggleMaximize('graph')"
+          />
+        </div>
+
+        <!-- Right Panel: Step3 Simulation -->
+        <div class="panel-wrapper right" :style="rightPanelStyle">
+          <Step3Simulation
+            :simulationId="currentSimulationId"
+            :maxRounds="maxRounds"
+            :minutesPerRound="minutesPerRound"
+            :projectData="projectData"
+            :graphData="graphData"
+            :systemLogs="systemLogs"
+            @go-back="handleGoBack"
+            @next-step="handleNextStep"
+            @add-log="addLog"
+            @update-status="updateStatus"
+          />
+        </div>
+      </template>
     </main>
   </div>
 </template>
@@ -73,6 +83,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GraphPanel from '../components/GraphPanel.vue'
 import Step3Simulation from '../components/Step3Simulation.vue'
+import SmsInboxPanel from '../components/SmsInboxPanel.vue'
 import { getProject, getGraphData } from '../api/graph'
 import { getSimulation, getSimulationConfig, getSimulationProfiles, getSimulationActions, getRunStatusDetail, stopSimulation, closeSimulationEnv, getEnvStatus, getSimulationRelationships } from '../api/simulation'
 import { getSimulationGroups } from '../api/scenario'
@@ -627,6 +638,12 @@ onUnmounted(() => {
 
 .panel-wrapper.left {
   border-right: 1px solid #EAEAEA;
+}
+
+.panel-wrapper.sms-full {
+  width: 100%;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 
