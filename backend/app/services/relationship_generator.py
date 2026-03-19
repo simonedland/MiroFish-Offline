@@ -9,6 +9,8 @@ Results are cached to relationships_ai.json in the simulation dir.
 import json
 import logging
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Optional
 
 from openai import AzureOpenAI
@@ -198,6 +200,7 @@ class RelationshipGenerator:
         groups: List[Dict],
         profiles_by_id: Dict[int, Dict],
         shared_graph: List[Dict],
+        graph_lock: threading.Lock = None,
     ) -> List[Dict]:
         """
         Run the agentic loop for a single agent.
@@ -248,8 +251,14 @@ class RelationshipGenerator:
                     args = json.loads(tc.function.arguments)
                 except json.JSONDecodeError:
                     args = {}
+                # Take a thread-safe snapshot of shared_graph for read-only tools
+                if graph_lock is not None and tc.function.name == "get_full_graph":
+                    with graph_lock:
+                        graph_snapshot = list(shared_graph)
+                else:
+                    graph_snapshot = shared_graph
                 result = self._dispatch_tool(
-                    tc.function.name, args, src_id, profiles_by_id, shared_graph, staged_buffer
+                    tc.function.name, args, src_id, profiles_by_id, graph_snapshot, staged_buffer
                 )
                 messages.append({
                     "role": "tool",
@@ -265,48 +274,60 @@ class RelationshipGenerator:
     # Core negotiation loop
     # ------------------------------------------------------------------
 
+    MAX_PARALLEL_AGENTS = 5
+
     def _negotiate_all(
         self,
         profiles: List[Dict[str, Any]],
         groups: List[Dict[str, Any]],
         progress_callback: Optional[Callable[[int, int, int], None]] = None,
     ) -> List[Dict[str, Any]]:
-        """Iterate agents sequentially; each runs its own agentic loop."""
+        """Run agent agentic loops in parallel (up to MAX_PARALLEL_AGENTS at once)."""
         profiles_sorted = sorted(profiles, key=lambda p: p.get("user_id", p.get("id", 0)))
         profiles_by_id = {p.get("user_id", p.get("id", 0)): p for p in profiles_sorted}
 
         shared_graph: List[Dict] = []
+        graph_lock = threading.Lock()
+        counter_lock = threading.Lock()
+        completed = 0
         failed = 0
         total = len(profiles_sorted)
 
-        for idx, profile in enumerate(profiles_sorted):
+        def run_one(profile: Dict) -> tuple:
             uid = profile.get("user_id", profile.get("id"))
             username = profile.get("username", profile.get("user_name", f"agent_{uid}"))
             logger.info(f"Negotiating relationships for agent {uid} ({username})")
-
-            # Token budget warning: rough estimate
-            estimated_tokens = len(json.dumps(shared_graph)) // 4
-            if estimated_tokens > 50_000:
-                logger.warning(
-                    f"Shared graph is large (~{estimated_tokens} tokens). "
-                    "get_full_graph() calls may approach context limits."
-                )
-
             try:
-                staged = self._run_agent_loop(profile, groups, profiles_by_id, shared_graph)
-                shared_graph.extend(staged)
-                logger.info(f"Agent {uid} declared {len(staged)} relationship(s); graph total: {len(shared_graph)}")
+                staged = self._run_agent_loop(
+                    profile, groups, profiles_by_id, shared_graph, graph_lock
+                )
+                with graph_lock:
+                    shared_graph.extend(staged)
+                    graph_size = len(shared_graph)
+                logger.info(f"Agent {uid} declared {len(staged)} relationship(s); graph total: {graph_size}")
+                return False
             except Exception as e:
-                failed += 1
                 logger.warning(f"Agent {uid} loop failed: {e}")
+                return True
 
-            if progress_callback:
-                try:
-                    progress_callback(idx + 1, total, len(shared_graph))
-                except Exception:
-                    pass
+        workers = min(self.MAX_PARALLEL_AGENTS, total)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(run_one, p) for p in profiles_sorted]
+            for future in as_completed(futures):
+                is_failed = future.result()
+                with counter_lock:
+                    completed += 1
+                    if is_failed:
+                        failed += 1
+                    current = completed
+                with graph_lock:
+                    graph_size = len(shared_graph)
+                if progress_callback:
+                    try:
+                        progress_callback(current, total, graph_size)
+                    except Exception:
+                        pass
 
-        total = len(profiles_sorted)
         if total > 0 and failed / total > FAILURE_THRESHOLD:
             raise RuntimeError(
                 f"RelationshipGenerator: {failed}/{total} agents failed "
