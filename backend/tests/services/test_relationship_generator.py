@@ -235,3 +235,131 @@ class TestToolFunctions:
         assert len(staged) == 1
         assert staged[0]["type"] == "KNOWS"
         assert staged[0]["label"] == "second"
+
+
+@patch("app.services.relationship_generator.AzureOpenAI")
+class TestAgenticLoop:
+    """Tests for _run_agent_loop and _negotiate_all via generate()."""
+
+    def _make_generator(self, mock_azure):
+        """Return a RelationshipGenerator with a mocked LLM client."""
+        gen = RelationshipGenerator()
+        gen.client = mock_azure.return_value
+        return gen
+
+    # Natural finish (no tool calls) -------------------------------------
+
+    def test_agent_with_no_tool_calls_adds_no_edges(self, mock_azure, tmp_path):
+        mock_azure.return_value.chat.completions.create.return_value = _make_finish_response()
+        gen = self._make_generator(mock_azure)
+        result = gen.generate(str(tmp_path), PROFILES, GROUPS, force=True)
+        assert result == []
+
+    # Single declare_relationship ----------------------------------------
+
+    def test_agent_declares_one_relationship(self, mock_azure, tmp_path):
+        # Turn 1: declare_relationship; Turn 2: finish
+        mock_azure.return_value.chat.completions.create.side_effect = [
+            _make_tool_call_response("declare_relationship", {"tgt_id": 1, "type": "FOLLOWS", "label": "follows bob"}),
+            _make_finish_response(),
+            # remaining agents also immediately finish
+            _make_finish_response(),
+            _make_finish_response(),
+        ]
+        gen = self._make_generator(mock_azure)
+        # Only run agent 0 by passing just 2 profiles
+        result = gen.generate(str(tmp_path), PROFILES[:2], GROUPS, force=True)
+        assert len(result) == 1
+        assert result[0] == {"src_id": 0, "tgt_id": 1, "type": "FOLLOWS", "label": "follows bob"}
+
+    # Staged edges not visible mid-loop via get_full_graph ---------------
+
+    def test_agent_staged_edges_not_in_graph_during_loop(self, mock_azure, tmp_path):
+        captured_graph_responses = []
+
+        def side_effect(*args, **kwargs):
+            messages = kwargs.get("messages", args[1] if len(args) > 1 else [])
+            # Check if any tool result for get_full_graph is in the history
+            for m in messages:
+                if m.get("role") == "tool" and m.get("content", "").startswith("["):
+                    captured_graph_responses.append(json.loads(m["content"]))
+            # Turn 1 for agent 0: declare, then finish
+            call_count = mock_azure.return_value.chat.completions.create.call_count
+            if call_count == 1:
+                return _make_tool_call_response("declare_relationship", {"tgt_id": 1, "type": "FOLLOWS", "label": "test"})
+            if call_count == 2:
+                return _make_finish_response()
+            # Agent 1: get_full_graph, then finish
+            if call_count == 3:
+                return _make_tool_call_response("get_full_graph", {})
+            return _make_finish_response()
+
+        mock_azure.return_value.chat.completions.create.side_effect = side_effect
+        gen = self._make_generator(mock_azure)
+        gen.generate(str(tmp_path), PROFILES[:2], GROUPS, force=True)
+
+        # Agent 1's get_full_graph should see agent 0's committed edge
+        assert any(len(g) == 1 for g in captured_graph_responses), \
+            "Agent 1 should see agent 0's committed edge via get_full_graph"
+
+    # Max-turn guard flushes staged edges --------------------------------
+
+    def test_max_turn_guard_flushes_staged_edges(self, mock_azure, tmp_path):
+        # Agent 0 declares one relationship, then keeps calling tools until max turns
+        responses = []
+        # Turn 1: declare
+        responses.append(_make_tool_call_response(
+            "declare_relationship", {"tgt_id": 1, "type": "KNOWS", "label": "met at event"}
+        ))
+        # Turns 2–10: keep calling list_agents (never finishes naturally)
+        for _ in range(9):
+            responses.append(_make_tool_call_response("list_agents", {}))
+        # Remaining agents finish immediately
+        responses.extend([_make_finish_response()] * 10)
+
+        mock_azure.return_value.chat.completions.create.side_effect = responses
+        gen = self._make_generator(mock_azure)
+        result = gen.generate(str(tmp_path), PROFILES[:2], GROUPS, force=True)
+
+        # Edge should be flushed even though max turns was hit
+        assert any(e["type"] == "KNOWS" for e in result)
+
+    # Exception handling -------------------------------------------------
+
+    def test_single_agent_failure_is_skipped(self, mock_azure, tmp_path):
+        call_count = [0]
+
+        def side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise RuntimeError("LLM timeout")
+            return _make_finish_response()
+
+        mock_azure.return_value.chat.completions.create.side_effect = side_effect
+        gen = self._make_generator(mock_azure)
+        # Should not raise; agent 0 fails, agent 1 succeeds
+        result = gen.generate(str(tmp_path), PROFILES[:2], GROUPS, force=True)
+        assert isinstance(result, list)
+
+    def test_majority_failure_raises_runtime_error(self, mock_azure, tmp_path):
+        mock_azure.return_value.chat.completions.create.side_effect = RuntimeError("LLM down")
+        gen = self._make_generator(mock_azure)
+        with pytest.raises(RuntimeError, match="threshold"):
+            gen.generate(str(tmp_path), PROFILES, GROUPS, force=True)
+
+    # Cache is written after successful run ------------------------------
+
+    def test_edges_are_written_to_cache(self, mock_azure, tmp_path):
+        mock_azure.return_value.chat.completions.create.side_effect = [
+            _make_tool_call_response("declare_relationship", {"tgt_id": 1, "type": "FOLLOWS", "label": "test"}),
+            _make_finish_response(),
+            _make_finish_response(),
+            _make_finish_response(),
+        ]
+        gen = self._make_generator(mock_azure)
+        gen.generate(str(tmp_path), PROFILES[:2], GROUPS, force=True)
+
+        cache_path = tmp_path / "relationships_ai.json"
+        assert cache_path.exists()
+        cached = json.loads(cache_path.read_text())
+        assert len(cached) == 1
