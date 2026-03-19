@@ -180,18 +180,15 @@ class RelationshipGenerator:
         username = profile.get("username", profile.get("user_name", "agent"))
         profile_json = json.dumps(profile, ensure_ascii=False, indent=2)
         return (
-            f"You are {username}, a social media user.\n\n"
-            f"Your profile:\n{profile_json}\n\n"
-            f"Your group: {group_name} — {group_description}\n\n"
-            "You are setting up your social connections before joining a simulation.\n"
-            "Use the available tools to explore who else is participating and what\n"
-            "relationships already exist. Then declare the relationships that feel\n"
-            "authentic to your character.\n\n"
-            "Guidance: 2–8 relationships is typical for most personas. You may declare\n"
-            "fewer if you are a loner, or more if you are highly social — but let your\n"
-            "character guide you, not a desire to maximise connections.\n\n"
-            "When you are done declaring relationships, stop calling tools and reply\n"
-            "with a brief closing statement."
+            f"Simulation character: {username}\n\n"
+            f"Profile:\n{profile_json}\n\n"
+            f"Group: {group_name} — {group_description}\n\n"
+            "Task: establish social connections for this character before the simulation begins.\n"
+            "Use the available tools to browse other participants and the growing social graph,\n"
+            "then declare the relationships that fit this character's background.\n\n"
+            "Guidance: 2–8 relationships is typical. Fewer for a loner, more for a highly social\n"
+            "character — let the background guide the count, not a desire to maximise connections.\n\n"
+            "When finished declaring relationships, stop calling tools and send a brief closing note."
         )
 
     def _run_agent_loop(

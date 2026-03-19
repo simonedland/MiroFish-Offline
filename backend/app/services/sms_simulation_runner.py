@@ -346,12 +346,11 @@ class SmsSimulationRunner:
         persona = getattr(sender, "persona", "") or getattr(sender, "bio", "") or ""
 
         return (
-            f"You are {sender.name}, phone number {sender.phone_number}.\n"
-            f"{persona}\n\n"
-            f"Your contacts:\n{contacts_block}\n\n"
-            "You communicate via SMS. Keep messages short and natural — write how a real person "
-            "texts. Stay in character. Your relationship context is listed above; let it shape "
-            "what you talk about and your tone."
+            f"Simulation character: {sender.name}, phone {sender.phone_number}.\n"
+            f"Background: {persona}\n\n"
+            f"Contacts:\n{contacts_block}\n\n"
+            "Write short, realistic SMS messages (1–3 sentences) as this character would text. "
+            "Match the tone and topic suggested by each relationship label."
         )
 
     def _build_user_prompt(self, sender, receiver, thread: list, round_num: int, relationship: dict = None) -> str:
@@ -381,10 +380,11 @@ class SmsSimulationRunner:
         rel_line = f"\nRelationship: {rel_context}" if rel_context else ""
 
         return (
-            f"[SMS with {receiver.name}]{rel_line}\n"
+            f"[SMS thread with {receiver.name}]{rel_line}\n"
             f"{history_block}\n\n"
-            f"Round {round_num}. Send {receiver.name} a message that fits your relationship and situation. "
-            "If you have nothing relevant to say, set send_message to null.\n"
+            f"Round {round_num}. Write the next SMS from {sender.name} to {receiver.name}, "
+            "fitting the relationship and conversation so far. "
+            "If there is genuinely nothing to say, set send_message to null.\n"
             'Respond with JSON only: {"send_message": "<text or null>", "continue_conversation": <true|false>}'
         )
 
@@ -396,7 +396,7 @@ class SmsSimulationRunner:
             msg = data.get("send_message")
             if msg == "null" or msg == "":
                 msg = None
-            cont = bool(data.get("continue_conversation", False))
+            cont = bool(data.get("continue_conversation", True))
             return AgentTurnResult(send_message=msg, continue_conversation=cont)
         except (json.JSONDecodeError, AttributeError):
             logger.warning("Failed to parse LLM response: %r", raw[:200])
