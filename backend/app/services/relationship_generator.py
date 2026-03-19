@@ -125,7 +125,7 @@ class RelationshipGenerator:
         profiles_by_id: Dict[int, Dict],
         staged_buffer: List[Dict],
     ) -> str:
-        """declare_relationship(...) → 'ok' or error string."""
+        """declare_relationship(...) → 'ok' or error string. Mutates staged_buffer on success."""
         if tgt_id not in profiles_by_id:
             return f"error: tgt_id {tgt_id} does not exist"
         if src_id == tgt_id:

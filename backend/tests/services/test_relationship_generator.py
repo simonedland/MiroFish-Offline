@@ -198,6 +198,7 @@ class TestToolFunctions:
             0, 0, "FOLLOWS", "test", self.profiles_by_id, staged
         )
         assert "error" in out
+        assert staged == []
 
     def test_declare_relationship_invalid_type(self):
         staged = []
@@ -205,6 +206,7 @@ class TestToolFunctions:
             0, 1, "HATES", "test", self.profiles_by_id, staged
         )
         assert "error" in out
+        assert staged == []
 
     def test_declare_relationship_empty_label(self):
         staged = []
@@ -215,9 +217,10 @@ class TestToolFunctions:
 
     def test_declare_relationship_label_truncated_to_120(self):
         staged = []
-        RelationshipGenerator._tool_declare_relationship(
+        out = RelationshipGenerator._tool_declare_relationship(
             0, 1, "FOLLOWS", "x" * 200, self.profiles_by_id, staged
         )
+        assert out == "ok"
         assert len(staged[0]["label"]) == 120
 
     def test_declare_relationship_deduplicates_within_buffer(self):
