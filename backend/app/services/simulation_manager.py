@@ -624,8 +624,9 @@ class SimulationManager:
                 import csv as _csv
                 twitter_data = [p.to_twitter_format() for p in profiles]
                 if twitter_data:
+                    all_fields = list(dict.fromkeys(k for row in twitter_data for k in row.keys()))
                     with open(twitter_path, 'w', encoding='utf-8', newline='') as f:
-                        writer = _csv.DictWriter(f, fieldnames=list(twitter_data[0].keys()))
+                        writer = _csv.DictWriter(f, fieldnames=all_fields, extrasaction='ignore')
                         writer.writeheader()
                         writer.writerows(twitter_data)
 
