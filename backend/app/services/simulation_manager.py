@@ -739,6 +739,23 @@ class SimulationManager:
         state.status = SimulationStatus.RUNNING
         self._save_simulation_state(state)
 
+        run_state_path = os.path.join(sim_dir, "run_state.json")
+
+        def _write_run_state(runner_status: str, current_round: int = 0) -> None:
+            try:
+                with open(run_state_path, "w", encoding="utf-8") as f:
+                    import json as _json2
+                    _json2.dump({
+                        "runner_status": runner_status,
+                        "current_round": current_round,
+                        "total_rounds": total_rounds,
+                        "simulation_mode": "sms",
+                    }, f)
+            except Exception:
+                pass
+
+        _write_run_state("running")
+
         def _run_in_thread():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -752,10 +769,12 @@ class SimulationManager:
                 loop.run_until_complete(runner.run())
                 state.status = SimulationStatus.COMPLETED
                 self._save_simulation_state(state)
+                _write_run_state("completed", total_rounds)
             except Exception as exc:
                 logger.error("SMS simulation %s failed: %s", simulation_id, exc, exc_info=True)
                 state.status = SimulationStatus.FAILED
                 self._save_simulation_state(state)
+                _write_run_state("failed")
             finally:
                 loop.close()
 

@@ -155,10 +155,11 @@ class SmsSimulationRunner:
 
     async def _run_conversation(self, agent_a, agent_b, round_num: int) -> None:
         """Run a back-and-forth conversation between two agents for up to MAX_TURNS_PER_ROUND turns."""
+        relationship = self._get_relationship(agent_a.user_id, agent_b.user_id)
         sender, receiver = agent_a, agent_b
         for turn in range(MAX_TURNS_PER_ROUND):
             try:
-                result = await self._agent_turn(sender, receiver, round_num)
+                result = await self._agent_turn(sender, receiver, round_num, relationship)
             except Exception as exc:
                 logger.warning(
                     "Turn %d failed for %s→%s: %s",
@@ -202,8 +203,8 @@ class SmsSimulationRunner:
         active_pairs = []
 
         for edge in edges:
-            source_id = edge.get("source") or edge.get("source_id")
-            target_id = edge.get("target") or edge.get("target_id")
+            source_id = edge.get("src_id") or edge.get("source") or edge.get("source_id")
+            target_id = edge.get("tgt_id") or edge.get("target") or edge.get("target_id")
             rel_type = (edge.get("type") or edge.get("relationship_type") or "").upper()
 
             profile_a = self._resolve_profile(source_id)
@@ -277,11 +278,11 @@ class SmsSimulationRunner:
     # LLM interaction
     # ------------------------------------------------------------------
 
-    async def _agent_turn(self, sender, receiver, round_num: int) -> AgentTurnResult:
+    async def _agent_turn(self, sender, receiver, round_num: int, relationship: dict = None) -> AgentTurnResult:
         """Ask the LLM to produce one SMS message as sender → receiver."""
         thread = get_thread(self.simulation_id, sender.phone_number, receiver.phone_number, limit=20)
         system_prompt = self._build_system_prompt(sender)
-        user_prompt = self._build_user_prompt(sender, receiver, thread, round_num)
+        user_prompt = self._build_user_prompt(sender, receiver, thread, round_num, relationship or {})
 
         try:
             response = await self._llm_client.chat.completions.create(
@@ -300,13 +301,27 @@ class SmsSimulationRunner:
             logger.warning("LLM call failed: %s", exc)
             return AgentTurnResult(send_message=None, continue_conversation=False)
 
+    def _get_relationship(self, id_a: int, id_b: int) -> dict:
+        """Return the edge dict between two agents (either direction), or {}."""
+        for edge in self._extract_edges():
+            src = edge.get("src_id") or edge.get("source") or edge.get("source_id")
+            tgt = edge.get("tgt_id") or edge.get("target") or edge.get("target_id")
+            try:
+                src, tgt = int(src), int(tgt)
+            except (TypeError, ValueError):
+                continue
+            if (src == id_a and tgt == id_b) or (src == id_b and tgt == id_a):
+                return edge
+        return {}
+
     def _build_system_prompt(self, sender) -> str:
-        # Collect contacts and their relationship types
+        # Collect contacts with relationship type and label
         contact_lines = []
         for edge in self._extract_edges():
-            source_id = edge.get("source") or edge.get("source_id")
-            target_id = edge.get("target") or edge.get("target_id")
+            source_id = edge.get("src_id") or edge.get("source") or edge.get("source_id")
+            target_id = edge.get("tgt_id") or edge.get("target") or edge.get("target_id")
             rel_type = (edge.get("type") or edge.get("relationship_type") or "KNOWS").upper()
+            label = edge.get("label", "")
 
             src_profile = self._resolve_profile(source_id)
             tgt_profile = self._resolve_profile(target_id)
@@ -321,8 +336,9 @@ class SmsSimulationRunner:
                 continue
 
             if contact.phone_number:
+                label_part = f' — "{label}"' if label else ""
                 contact_lines.append(
-                    f"- {contact.name} ({contact.phone_number}): [{rel_type}]"
+                    f"- {contact.name} ({contact.phone_number}): [{rel_type}]{label_part}"
                 )
 
         contacts_block = "\n".join(contact_lines) if contact_lines else "- (no contacts)"
@@ -333,10 +349,23 @@ class SmsSimulationRunner:
             f"You are {sender.name}, phone number {sender.phone_number}.\n"
             f"{persona}\n\n"
             f"Your contacts:\n{contacts_block}\n\n"
-            "You communicate via SMS. Be concise and in-character. Short messages only."
+            "You communicate via SMS. Keep messages short and natural — write how a real person "
+            "texts. Stay in character. Your relationship context is listed above; let it shape "
+            "what you talk about and your tone."
         )
 
-    def _build_user_prompt(self, sender, receiver, thread: list, round_num: int) -> str:
+    def _build_user_prompt(self, sender, receiver, thread: list, round_num: int, relationship: dict = None) -> str:
+        rel_type = (relationship.get("type") or "").upper() if relationship else ""
+        rel_label = relationship.get("label", "") if relationship else ""
+
+        # Build a short relationship context line
+        if rel_label:
+            rel_context = f"[{rel_type}: {rel_label}]" if rel_type else f"[{rel_label}]"
+        elif rel_type:
+            rel_context = f"[{rel_type}]"
+        else:
+            rel_context = ""
+
         history_lines = []
         for msg in thread:
             s_name = msg.get("sender_name", "?")
@@ -346,15 +375,17 @@ class SmsSimulationRunner:
         history_block = (
             "\n".join(history_lines)
             if history_lines
-            else "(no previous messages)"
+            else "(no previous messages — you can start a conversation)"
         )
 
+        rel_line = f"\nRelationship: {rel_context}" if rel_context else ""
+
         return (
-            f"[Conversation with {receiver.name}]\n"
+            f"[SMS with {receiver.name}]{rel_line}\n"
             f"{history_block}\n\n"
-            f"Round {round_num}. Respond with JSON only:\n"
-            '{"send_message": "<your SMS text or null if you have nothing to say>", '
-            '"continue_conversation": <true if you expect a reply, false to end>}'
+            f"Round {round_num}. Send {receiver.name} a message that fits your relationship and situation. "
+            "If you have nothing relevant to say, set send_message to null.\n"
+            'Respond with JSON only: {"send_message": "<text or null>", "continue_conversation": <true|false>}'
         )
 
     @staticmethod
