@@ -7,6 +7,8 @@ import os
 import pytest
 from unittest.mock import MagicMock, patch, call
 
+from app.services.relationship_generator import RelationshipGenerator, VALID_TYPES
+
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -55,9 +57,6 @@ GROUPS = [
         "communication_style": "informative",
     },
 ]
-
-
-from backend.app.services.relationship_generator import RelationshipGenerator, VALID_TYPES
 
 
 def _make_finish_response(content="Done."):
