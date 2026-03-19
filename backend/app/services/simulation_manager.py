@@ -656,6 +656,29 @@ class SimulationManager:
 
             state.config_generated = True
             state.config_reasoning = sim_params.generation_reasoning
+            self._save_simulation_state(state)
+
+            # ---- Phase 4: Generate relationships ----
+            logger.info(f"[{simulation_id}] Generating agent relationships...")
+            from .relationship_generator import RelationshipGenerator
+            import json as _json
+
+            profiles_path = os.path.join(sim_dir, "reddit_profiles.json")
+            rel_profiles = []
+            if os.path.exists(profiles_path):
+                with open(profiles_path, "r", encoding="utf-8") as f:
+                    rel_profiles = _json.load(f)
+            groups_data = scenario.to_dict().get("groups", [])
+
+            def _rel_progress(agent_current: int, agent_total: int, rel_count: int) -> None:
+                state.relationship_agent_current = agent_current
+                state.relationship_agent_total = agent_total
+                state.relationship_count = rel_count
+                self._save_simulation_state(state)
+
+            gen = RelationshipGenerator()
+            gen.generate(sim_dir, rel_profiles, groups_data, progress_callback=_rel_progress)
+            logger.info(f"[{simulation_id}] Relationships generated: {state.relationship_count} edges")
 
             # ---- Done ----
             state.status = SimulationStatus.READY
