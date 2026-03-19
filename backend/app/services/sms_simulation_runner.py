@@ -109,6 +109,8 @@ class SmsSimulationRunner:
         self._id_to_profile: dict = {p.user_id: p for p in profiles}
 
         self._db_lock = asyncio.Lock()
+        # Limit concurrent LLM calls to avoid rate-limit errors
+        self._llm_semaphore = asyncio.Semaphore(3)
 
         # Azure OpenAI client (lazy init in async context)
         self._llm_client: Optional[AsyncAzureOpenAI] = None
@@ -284,22 +286,37 @@ class SmsSimulationRunner:
         system_prompt = self._build_system_prompt(sender)
         user_prompt = self._build_user_prompt(sender, receiver, thread, round_num, relationship or {})
 
-        try:
-            response = await self._llm_client.chat.completions.create(
-                model=self._deployment,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0.8,
-                max_tokens=256,
-                response_format={"type": "json_object"},
-            )
-            raw = response.choices[0].message.content or ""
-            return self._parse_turn_response(raw)
-        except Exception as exc:
-            logger.warning("LLM call failed: %s", exc)
-            return AgentTurnResult(send_message=None, continue_conversation=False)
+        for attempt in range(4):
+            try:
+                async with self._llm_semaphore:
+                    response = await self._llm_client.chat.completions.create(
+                        model=self._deployment,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        temperature=0.8,
+                        max_tokens=256,
+                        response_format={"type": "json_object"},
+                    )
+                raw = response.choices[0].message.content or ""
+                return self._parse_turn_response(raw)
+            except Exception as exc:
+                exc_str = str(exc)
+                if "429" in exc_str or "RateLimitReached" in exc_str:
+                    # Parse retry-after from error message if available
+                    wait = 5 * (2 ** attempt)  # 5, 10, 20, 40s
+                    import re as _re
+                    match = _re.search(r"retry after (\d+) second", exc_str, _re.IGNORECASE)
+                    if match:
+                        wait = int(match.group(1)) + 1
+                    logger.warning("Rate limited, waiting %ds (attempt %d/4)", wait, attempt + 1)
+                    await asyncio.sleep(wait)
+                else:
+                    logger.warning("LLM call failed: %s", exc)
+                    return AgentTurnResult(send_message=None, continue_conversation=False)
+
+        return AgentTurnResult(send_message=None, continue_conversation=False)
 
     def _get_relationship(self, id_a: int, id_b: int) -> dict:
         """Return the edge dict between two agents (either direction), or {}."""

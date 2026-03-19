@@ -42,8 +42,16 @@
       </div>
     </div>
 
-    <!-- Main Content: Dual Timeline -->
-    <div class="main-content-area" ref="scrollContainer">
+    <!-- Main Content: SMS Inbox -->
+    <div class="main-content-area sms-mode" ref="scrollContainer">
+      <SmsInboxPanel
+        :simulation-id="simulationId"
+        :is-running="phase === 1"
+      />
+    </div>
+
+    <!-- Hidden: Dual Timeline (kept for non-SMS modes) -->
+    <div v-if="false" class="main-content-area" ref="scrollContainer">
       <!-- Timeline Header -->
       <div class="timeline-header" v-if="allActions.length > 0">
         <div class="timeline-stats">
@@ -277,13 +285,14 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { 
-  startSimulation, 
+import {
+  startSimulation,
   stopSimulation,
-  getRunStatus, 
+  getRunStatus,
   getRunStatusDetail
 } from '../api/simulation'
 import { generateReport } from '../api/report'
+import SmsInboxPanel from './SmsInboxPanel.vue'
 
 const props = defineProps({
   simulationId: String,
@@ -924,6 +933,13 @@ onUnmounted(() => {
   overflow-y: auto;
   position: relative;
   background: #FFF;
+}
+
+.main-content-area.sms-mode {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
 }
 
 /* Timeline Header */

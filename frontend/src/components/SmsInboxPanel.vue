@@ -81,7 +81,13 @@ const messagesByRound = computed(() => {
 async function loadAgents() {
   try {
     const res = await getAgents(props.simulationId)
-    if (res.success) agents.value = res.data
+    if (res.success) {
+      agents.value = res.data
+      // Auto-select first agent if none selected yet
+      if (!selectedAgent.value && agents.value.length > 0) {
+        await selectAgent(agents.value[0])
+      }
+    }
   } catch (e) {
     console.error('Failed to load agents', e)
   }
@@ -98,7 +104,13 @@ async function loadContacts() {
   if (!selectedAgent.value) return
   try {
     const res = await getThreads(props.simulationId, selectedAgent.value.phone_number)
-    if (res.success) contacts.value = res.data
+    if (res.success) {
+      contacts.value = res.data
+      // Auto-select first contact with messages if none selected yet
+      if (!selectedContact.value && contacts.value.length > 0) {
+        await selectContact(contacts.value[0])
+      }
+    }
   } catch (e) {
     console.error('Failed to load contacts', e)
   }
@@ -164,6 +176,7 @@ onUnmounted(stopPolling)
   grid-template-columns: 180px 200px 1fr;
   height: 100%;
   min-height: 400px;
+  flex: 1;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   overflow: hidden;

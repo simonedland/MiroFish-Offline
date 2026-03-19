@@ -271,7 +271,7 @@ class RelationshipGenerator:
     # Core negotiation loop
     # ------------------------------------------------------------------
 
-    MAX_PARALLEL_AGENTS = 5
+    MAX_PARALLEL_AGENTS = 3
 
     def _negotiate_all(
         self,
