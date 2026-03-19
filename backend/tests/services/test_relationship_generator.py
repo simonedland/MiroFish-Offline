@@ -85,3 +85,45 @@ def _make_tool_call_response(tool_name, tool_args: dict, call_id="call_1"):
     resp = MagicMock()
     resp.choices = [choice]
     return resp
+
+
+@patch("app.services.relationship_generator.AzureOpenAI")
+class TestDegenerateInputs:
+
+    def test_empty_profiles_returns_empty(self, mock_azure, tmp_path):
+        gen = RelationshipGenerator()
+        result = gen.generate(str(tmp_path), [], GROUPS)
+        assert result == []
+
+    def test_single_profile_returns_empty(self, mock_azure, tmp_path):
+        gen = RelationshipGenerator()
+        result = gen.generate(str(tmp_path), [PROFILES[0]], GROUPS)
+        assert result == []
+
+    def test_cache_hit_skips_llm(self, mock_azure, tmp_path):
+        cached = [{"src_id": 0, "tgt_id": 1, "type": "FOLLOWS", "label": "friends"}]
+        cache_path = tmp_path / "relationships_ai.json"
+        cache_path.write_text(json.dumps(cached))
+
+        gen = RelationshipGenerator()
+        result = gen.generate(str(tmp_path), PROFILES, GROUPS, force=False)
+
+        assert result == cached
+        # LLM client should never have been called
+        mock_azure.return_value.chat.completions.create.assert_not_called()
+
+    def test_force_ignores_cache(self, mock_azure, tmp_path):
+        cached = [{"src_id": 0, "tgt_id": 1, "type": "FOLLOWS", "label": "old"}]
+        cache_path = tmp_path / "relationships_ai.json"
+        cache_path.write_text(json.dumps(cached))
+
+        # Every agent immediately finishes (no tool calls, no relationships)
+        mock_azure.return_value.chat.completions.create.return_value = (
+            _make_finish_response()
+        )
+
+        gen = RelationshipGenerator()
+        result = gen.generate(str(tmp_path), PROFILES, GROUPS, force=True)
+
+        # Result should be fresh (empty, since agents declared nothing)
+        assert result == []
