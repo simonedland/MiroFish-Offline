@@ -69,6 +69,7 @@ class OasisAgentProfile:
             "name": self.name,
             "bio": self.bio,
             "persona": self.persona,
+            "phone_number": self.phone_number,
             "karma": self.karma,
             "created_at": self.created_at,
             "group_id": self.group_id,
@@ -103,6 +104,7 @@ class OasisAgentProfile:
             "description": self.bio,
             "bio": self.bio,
             "persona": self.persona,
+            "phone_number": self.phone_number,
             "friend_count": self.friend_count,
             "follower_count": self.follower_count,
             "statuses_count": self.statuses_count,
@@ -133,6 +135,7 @@ class OasisAgentProfile:
             "name": self.name,
             "bio": self.bio,
             "persona": self.persona,
+            "phone_number": self.phone_number,
             "karma": self.karma,
             "friend_count": self.friend_count,
             "follower_count": self.follower_count,
@@ -185,8 +188,9 @@ Context Information:
 
 Please generate JSON containing the following fields:
 
-1. bio: Social media bio, 200 characters
-2. persona: Detailed persona description (2000 words of pure text), must include:
+1. name: A realistic first and last name for this character (e.g. 'Maria Chen', 'James Wilson')
+2. bio: Social media bio, 200 characters
+3. persona: Detailed persona description (2000 words of pure text), must include:
    - Basic information (age, profession, educational background, location)
    - Personal background (important experiences, event associations, social relationships)
    - Personality traits (MBTI type, core personality, emotional expression)
@@ -194,12 +198,12 @@ Please generate JSON containing the following fields:
    - Positions and views (attitudes toward topics, content that may provoke/touch emotions)
    - Unique features (catchphrases, special experiences, personal interests)
    - Personal memories (important part of persona, introduce this individual's association with events and their existing actions/reactions in events)
-3. age: Age as number (must be integer)
-4. gender: Gender, must be in English: "male" or "female"
-5. mbti: MBTI type (e.g., INTJ, ENFP)
-6. country: Country (use English, e.g., "US")
-7. profession: Profession
-8. interested_topics: Array of interested topics
+4. age: Age as number (must be integer)
+5. gender: Gender, must be in English: "male" or "female"
+6. mbti: MBTI type (e.g., INTJ, ENFP)
+7. country: Country (use English, e.g., "US")
+8. profession: Profession
+9. interested_topics: Array of interested topics
 
 Important:
 - All field values must be strings or numbers, do not use newlines

@@ -2,6 +2,7 @@
 .github
 .gitignore
 .cursor
+.claude
 .DS_Store
 .env
 

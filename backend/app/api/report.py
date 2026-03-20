@@ -83,22 +83,36 @@ def generate_report():
                     }
                 })
 
-        # Get project info
-        project = ProjectManager.get_project(state.project_id)
-        if not project:
+        # Get project info — description-flow simulations use a sentinel project_id
+        # and have no real project record, so we fall back to scenario_definition.
+        is_description_flow = (state.project_id == "scenario_flow")
+        project = None if is_description_flow else ProjectManager.get_project(state.project_id)
+
+        if not is_description_flow and not project:
             return jsonify({
                 "success": False,
                 "error": f"Project does not exist: {state.project_id}"
             }), 404
 
-        graph_id = state.graph_id or project.graph_id
-        if not graph_id:
+        graph_id = state.graph_id or (project.graph_id if project else "")
+
+        # Description-flow simulations have no graph; that's fine — the ReportAgent
+        # will analyse SMS message data instead of knowledge-graph tools.
+        if not graph_id and not is_description_flow:
             return jsonify({
                 "success": False,
                 "error": "Missing graph ID, please ensure graph is built"
             }), 400
 
-        simulation_requirement = project.simulation_requirement
+        if is_description_flow:
+            # Build simulation_requirement from the parsed scenario definition.
+            scenario_def = state.scenario_definition or {}
+            title = scenario_def.get("title", "Simulation")
+            background = scenario_def.get("background", "")
+            simulation_requirement = f"{title}. {background}".strip(" .")
+        else:
+            simulation_requirement = project.simulation_requirement if project else ""
+
         if not simulation_requirement:
             return jsonify({
                 "success": False,
@@ -108,6 +122,12 @@ def generate_report():
         # Pre-generate report_id for immediate return to frontend
         import uuid
         report_id = f"report_{uuid.uuid4().hex[:12]}"
+
+        # Capture Neo4j storage before spawning thread (current_app not available in threads)
+        from ..services.graph_tools import GraphToolsService
+        from flask import current_app
+        storage = current_app.extensions.get('neo4j_storage')
+        graph_tools = GraphToolsService(storage=storage) if storage else None
 
         # Create async task
         task_manager = TaskManager()
@@ -129,12 +149,13 @@ def generate_report():
                     progress=0,
                     message="Initializing Report Agent..."
                 )
-                
+
                 # Create Report Agent
                 agent = ReportAgent(
                     graph_id=graph_id,
                     simulation_id=simulation_id,
-                    simulation_requirement=simulation_requirement
+                    simulation_requirement=simulation_requirement,
+                    graph_tools=graph_tools
                 )
 
                 # Progress callback
@@ -520,27 +541,36 @@ def chat_with_report_agent():
                 "error": f"Simulation does not exist: {simulation_id}"
             }), 404
 
-        project = ProjectManager.get_project(state.project_id)
-        if not project:
+        is_description_flow = (state.project_id == "scenario_flow")
+        project = None if is_description_flow else ProjectManager.get_project(state.project_id)
+
+        if not is_description_flow and not project:
             return jsonify({
                 "success": False,
                 "error": f"Project does not exist: {state.project_id}"
             }), 404
 
-        graph_id = state.graph_id or project.graph_id
-        if not graph_id:
-            return jsonify({
-                "success": False,
-                "error": "Missing graph ID"
-            }), 400
+        graph_id = state.graph_id or (project.graph_id if project else "")
 
-        simulation_requirement = project.simulation_requirement or ""
+        if is_description_flow:
+            scenario_def = state.scenario_definition or {}
+            title = scenario_def.get("title", "Simulation")
+            background = scenario_def.get("background", "")
+            simulation_requirement = f"{title}. {background}".strip(" .")
+        else:
+            simulation_requirement = project.simulation_requirement if project else ""
+
+        from ..services.graph_tools import GraphToolsService
+        from flask import current_app
+        storage = current_app.extensions.get('neo4j_storage')
+        graph_tools = GraphToolsService(storage=storage) if storage else None
 
         # Create Agent and chat
         agent = ReportAgent(
             graph_id=graph_id,
             simulation_id=simulation_id,
-            simulation_requirement=simulation_requirement
+            simulation_requirement=simulation_requirement,
+            graph_tools=graph_tools
         )
 
         result = agent.chat(message=message, chat_history=chat_history)

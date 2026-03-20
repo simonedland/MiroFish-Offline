@@ -546,6 +546,26 @@ Function Flow:
 
 [Important] This feature requires the OASIS simulation environment to be running!"""
 
+TOOL_DESC_READ_SMS = """\
+[SMS Message Reader - Read actual SMS communications from the simulation]
+Reads real SMS messages exchanged between agents during the simulation. Use this tool whenever the simulation used the SMS mode (no knowledge graph).
+
+Functions:
+1. get_stats — returns per-agent sent/received counts and total message volume
+2. get_all — returns all messages in chronological order (sender → receiver: content, round)
+3. get_agent — returns all messages involving a specific agent (provide agent_name)
+
+[Use Cases]
+- Understand communication patterns and frequency
+- Find who talks to whom and how much
+- Read the actual content of conversations to analyse tone, topics, relationships
+- Identify silent or hyperactive agents
+- Spot behavioural outliers in the network
+
+[Return Content]
+- Message content, sender, receiver, round number
+- Per-agent statistics when mode=get_stats"""
+
 # ── Outline Planning Prompt ──
 
 PLAN_SYSTEM_PROMPT = """\
@@ -954,6 +974,15 @@ class ReportAgent:
                     "interview_topic": "Interview topic or requirement description (e.g. 'understand students' views on the dorm formaldehyde incident')",
                     "max_agents": "Maximum number of agents to interview (optional, default 5, max 10)"
                 }
+            },
+            "read_sms_messages": {
+                "name": "read_sms_messages",
+                "description": TOOL_DESC_READ_SMS,
+                "parameters": {
+                    "mode": "One of: get_stats (per-agent counts), get_all (all messages, default), get_agent (messages for one agent)",
+                    "agent_name": "Agent name to filter by (only used with mode=get_agent)",
+                    "limit": "Max messages to return for get_all (default 200)"
+                }
             }
         }
     
@@ -1024,6 +1053,40 @@ class ReportAgent:
                 )
                 return result.to_text()
             
+            elif tool_name == "read_sms_messages":
+                from .sms_db import get_all_messages, get_message_stats, get_agent_recent_messages
+                mode = parameters.get("mode", "get_all")
+                if mode == "get_stats":
+                    stats = get_message_stats(self.simulation_id)
+                    if not stats:
+                        return "No SMS messages found for this simulation."
+                    lines = [f"Total messages: {stats['total_messages']}",
+                             f"Rounds: {stats['rounds']['min']}–{stats['rounds']['max']}",
+                             "", "Per-agent activity:"]
+                    for name, counts in sorted(stats['per_agent'].items(), key=lambda x: -(x[1]['sent'] + x[1]['received'])):
+                        lines.append(f"  {name}: sent={counts['sent']}, received={counts['received']}")
+                    return "\n".join(lines)
+                elif mode == "get_agent":
+                    agent_name = parameters.get("agent_name", "")
+                    # Find phone by name from profiles
+                    msgs = get_all_messages(self.simulation_id, limit=500)
+                    filtered = [m for m in msgs if m['sender_name'] == agent_name or m['receiver_name'] == agent_name]
+                    if not filtered:
+                        return f"No messages found for agent: {agent_name}"
+                    lines = [f"Messages involving {agent_name} ({len(filtered)} total):"]
+                    for m in filtered:
+                        lines.append(f"  [Round {m['round_num']}] {m['sender_name']} → {m['receiver_name']}: {m['content']}")
+                    return "\n".join(lines)
+                else:  # get_all
+                    limit = int(parameters.get("limit", 200))
+                    msgs = get_all_messages(self.simulation_id, limit=limit)
+                    if not msgs:
+                        return "No SMS messages found for this simulation."
+                    lines = [f"SMS message log ({len(msgs)} messages):"]
+                    for m in msgs:
+                        lines.append(f"  [Round {m['round_num']}] {m['sender_name']} → {m['receiver_name']}: {m['content']}")
+                    return "\n".join(lines)
+
             # ========== Backward Compatibility: Old Tools (Internal Redirect to New Tools) ==========
 
             elif tool_name == "search_graph":
@@ -1066,7 +1129,7 @@ class ReportAgent:
             return f"Tool execution failed: {str(e)}"
     
     # Valid tool names set, used for validation when parsing raw JSON fallback
-    VALID_TOOL_NAMES = {"insight_forge", "panorama_search", "quick_search", "interview_agents"}
+    VALID_TOOL_NAMES = {"insight_forge", "panorama_search", "quick_search", "interview_agents", "read_sms_messages"}
 
     def _parse_tool_calls(self, response: str) -> List[Dict[str, Any]]:
         """

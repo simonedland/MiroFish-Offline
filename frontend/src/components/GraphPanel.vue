@@ -711,16 +711,16 @@ const renderGraph = () => {
   const link = linkGroup.selectAll('path')
     .data(edges)
     .enter().append('path')
-    .attr('stroke', '#C0C0C0')
+    .attr('stroke', '#2e2e42')
     .attr('stroke-width', 1.5)
     .attr('fill', 'none')
     .style('cursor', 'pointer')
     .on('click', (event, d) => {
       event.stopPropagation()
       // Reset previous selected edge style
-      linkGroup.selectAll('path').attr('stroke', '#C0C0C0').attr('stroke-width', 1.5)
-      linkLabelBg.attr('fill', 'rgba(255,255,255,0.95)')
-      linkLabels.attr('fill', '#666')
+      linkGroup.selectAll('path').attr('stroke', '#2e2e42').attr('stroke-width', 1.5)
+      linkLabelBg.attr('fill', 'rgba(26,26,46,0.95)')
+      linkLabels.attr('fill', '#888')
       // Highlight currently selected edge
       d3.select(event.target).attr('stroke', '#3498db').attr('stroke-width', 3)
 
@@ -734,7 +734,7 @@ const renderGraph = () => {
   const linkLabelBg = linkGroup.selectAll('rect')
     .data(edges)
     .enter().append('rect')
-    .attr('fill', 'rgba(255,255,255,0.95)')
+    .attr('fill', 'rgba(26,26,46,0.95)')
     .attr('rx', 3)
     .attr('ry', 3)
     .style('cursor', 'pointer')
@@ -742,9 +742,9 @@ const renderGraph = () => {
     .style('display', showEdgeLabels.value ? 'block' : 'none')
     .on('click', (event, d) => {
       event.stopPropagation()
-      linkGroup.selectAll('path').attr('stroke', '#C0C0C0').attr('stroke-width', 1.5)
-      linkLabelBg.attr('fill', 'rgba(255,255,255,0.95)')
-      linkLabels.attr('fill', '#666')
+      linkGroup.selectAll('path').attr('stroke', '#2e2e42').attr('stroke-width', 1.5)
+      linkLabelBg.attr('fill', 'rgba(26,26,46,0.95)')
+      linkLabels.attr('fill', '#888')
       // Highlight corresponding edge
       link.filter(l => l === d).attr('stroke', '#3498db').attr('stroke-width', 3)
       d3.select(event.target).attr('fill', 'rgba(52, 152, 219, 0.1)')
@@ -761,7 +761,7 @@ const renderGraph = () => {
     .enter().append('text')
     .text(d => d.name)
     .attr('font-size', '9px')
-    .attr('fill', '#666')
+    .attr('fill', '#888')
     .attr('text-anchor', 'middle')
     .attr('dominant-baseline', 'middle')
     .style('cursor', 'pointer')
@@ -770,9 +770,9 @@ const renderGraph = () => {
     .style('display', showEdgeLabels.value ? 'block' : 'none')
     .on('click', (event, d) => {
       event.stopPropagation()
-      linkGroup.selectAll('path').attr('stroke', '#C0C0C0').attr('stroke-width', 1.5)
-      linkLabelBg.attr('fill', 'rgba(255,255,255,0.95)')
-      linkLabels.attr('fill', '#666')
+      linkGroup.selectAll('path').attr('stroke', '#2e2e42').attr('stroke-width', 1.5)
+      linkLabelBg.attr('fill', 'rgba(26,26,46,0.95)')
+      linkLabels.attr('fill', '#888')
       // Highlight corresponding edge
       link.filter(l => l === d).attr('stroke', '#3498db').attr('stroke-width', 3)
       d3.select(event.target).attr('fill', '#3498db')
@@ -810,7 +810,7 @@ const renderGraph = () => {
     .enter().append('circle')
     .attr('r', 10)
     .attr('fill', d => getColor(d.type))
-    .attr('stroke', '#fff')
+    .attr('stroke', '#1a1a2e')
     .attr('stroke-width', 2.5)
     .style('cursor', 'pointer')
     .call(d3.drag()
@@ -852,8 +852,8 @@ const renderGraph = () => {
     .on('click', (event, d) => {
       event.stopPropagation()
       // Reset all node styles
-      node.attr('stroke', '#fff').attr('stroke-width', 2.5)
-      linkGroup.selectAll('path').attr('stroke', '#C0C0C0').attr('stroke-width', 1.5)
+      node.attr('stroke', '#1a1a2e').attr('stroke-width', 2.5)
+      linkGroup.selectAll('path').attr('stroke', '#2e2e42').attr('stroke-width', 1.5)
       // Highlight selected node
       d3.select(event.target).attr('stroke', '#E91E63').attr('stroke-width', 4)
       // Highlight edges connected to this node
@@ -875,7 +875,7 @@ const renderGraph = () => {
     })
     .on('mouseleave', (event, d) => {
       if (!selectedItem.value || selectedItem.value.data?.uuid !== d.rawData.uuid) {
-        d3.select(event.target).attr('stroke', '#fff').attr('stroke-width', 2.5)
+        d3.select(event.target).attr('stroke', '#1a1a2e').attr('stroke-width', 2.5)
       }
     })
 
@@ -889,7 +889,7 @@ const renderGraph = () => {
     .enter().append('text')
     .text(d => d.name.length > 8 ? d.name.substring(0, 8) + '…' : d.name)
     .attr('font-size', '11px')
-    .attr('fill', '#333')
+    .attr('fill', '#ccc')
     .attr('font-weight', '500')
     .attr('dx', 14)
     .attr('dy', 4)
@@ -932,10 +932,10 @@ const renderGraph = () => {
   // Click on blank area to close detail panel
   svg.on('click', () => {
     selectedItem.value = null
-    node.attr('stroke', '#fff').attr('stroke-width', 2.5)
-    linkGroup.selectAll('path').attr('stroke', '#C0C0C0').attr('stroke-width', 1.5)
-    linkLabelBg.attr('fill', 'rgba(255,255,255,0.95)')
-    linkLabels.attr('fill', '#666')
+    node.attr('stroke', '#1a1a2e').attr('stroke-width', 2.5)
+    linkGroup.selectAll('path').attr('stroke', '#2e2e42').attr('stroke-width', 1.5)
+    linkLabelBg.attr('fill', 'rgba(26,26,46,0.95)')
+    linkLabels.attr('fill', '#888')
   })
 }
 
@@ -979,10 +979,10 @@ function animateDot(srcId, tgtId) {
     const cy = (sy + ty) / 2 + (dx / len) * offset
     tempPath = d3.select(svgG).append('path')
       .attr('d', `M${sx},${sy} Q${cx},${cy} ${tx},${ty}`)
-      .attr('stroke', '#e8642a')
+      .attr('stroke', '#ff9f4a')
       .attr('stroke-width', 1.5)
       .attr('fill', 'none')
-      .attr('opacity', 0.35)
+      .attr('opacity', 0.6)
       .attr('pointer-events', 'none')
     pathNode = tempPath.node()
   }
@@ -995,7 +995,7 @@ function animateDot(srcId, tgtId) {
 
   const dot = d3.select(svgG).append('circle')
     .attr('r', 5)
-    .attr('fill', '#e8642a')
+    .attr('fill', '#ff9f4a')
     .attr('pointer-events', 'none')
     .attr('opacity', 0.85)
 
@@ -1058,8 +1058,8 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  background-color: #FAFAFA;
-  background-image: radial-gradient(#D0D0D0 1.5px, transparent 1.5px);
+  background-color: #13131f;
+  background-image: radial-gradient(#2a2a3e 1.5px, transparent 1.5px);
   background-size: 24px 24px;
   overflow: hidden;
 }
@@ -1074,14 +1074,14 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0));
+  background: linear-gradient(to bottom, rgba(19,19,31,0.95), rgba(19,19,31,0));
   pointer-events: none;
 }
 
 .panel-title {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: #e0e0e0;
   pointer-events: auto;
 }
 
@@ -1095,24 +1095,24 @@ onUnmounted(() => {
 .tool-btn {
   height: 32px;
   padding: 0 12px;
-  border: 1px solid #E0E0E0;
-  background: #FFF;
+  border: 1px solid #2e2e42;
+  background: #1a1a2e;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   cursor: pointer;
-  color: #666;
+  color: #888;
   transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   font-size: 13px;
 }
 
 .tool-btn:hover {
-  background: #F5F5F5;
-  color: #000;
-  border-color: #CCC;
+  background: #2a2a3e;
+  color: #e0e0e0;
+  border-color: #3e3e56;
 }
 
 .tool-btn .btn-text {
@@ -1142,7 +1142,7 @@ onUnmounted(() => {
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
-  color: #999;
+  color: #555;
 }
 
 .empty-icon {
@@ -1156,11 +1156,11 @@ onUnmounted(() => {
   position: absolute;
   bottom: 24px;
   left: 24px;
-  background: rgba(255,255,255,0.95);
+  background: rgba(19,19,31,0.95);
   padding: 12px 16px;
   border-radius: 8px;
-  border: 1px solid #EAEAEA;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  border: 1px solid #2e2e42;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
   z-index: 10;
 }
 
@@ -1186,7 +1186,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #555;
+  color: #888;
 }
 
 .legend-dot {
@@ -1206,7 +1206,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 14px 16px 10px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #2e2e42;
 }
 .agent-avatar {
   width: 40px;
@@ -1221,15 +1221,15 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 .agent-identity-text { display: flex; flex-direction: column; gap: 2px; }
-.agent-username { font-size: 14px; font-weight: 700; color: #111; }
+.agent-username { font-size: 14px; font-weight: 700; color: #e0e0e0; }
 .agent-fullname { font-size: 11px; color: #888; }
 
 .agent-section {
   padding: 10px 16px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid #2e2e42;
 }
 .agent-section:last-child { border-bottom: none; }
-.group-section { background: #fafafa; }
+.group-section { background: #0f0f1a; }
 
 .agent-section-title {
   font-size: 10px;
@@ -1242,11 +1242,11 @@ onUnmounted(() => {
 
 .agent-prose {
   font-size: 12px;
-  color: #333;
+  color: #ccc;
   line-height: 1.55;
 }
 .agent-prose.small { font-size: 11px; }
-.agent-prose.muted { color: #666; }
+.agent-prose.muted { color: #888; }
 
 .agent-facts-grid {
   display: flex;
@@ -1259,7 +1259,7 @@ onUnmounted(() => {
   font-size: 11px;
 }
 .fact-k { color: #aaa; }
-.fact-v { color: #222; font-weight: 600; }
+.fact-v { color: #e0e0e0; font-weight: 600; }
 
 .agent-topics {
   display: flex;
@@ -1268,8 +1268,8 @@ onUnmounted(() => {
   margin-top: 6px;
 }
 .topic-tag {
-  background: #f0f0f0;
-  color: #555;
+  background: #1a1a2e;
+  color: #888;
   font-size: 10px;
   padding: 2px 7px;
   border-radius: 20px;
@@ -1286,7 +1286,7 @@ onUnmounted(() => {
 .bar-track {
   flex: 1;
   height: 6px;
-  background: #e8e8e8;
+  background: #2e2e42;
   border-radius: 3px;
   overflow: hidden;
 }
@@ -1294,7 +1294,7 @@ onUnmounted(() => {
 .bar-fill.activity { background: #e8642a; }
 .sentiment-track { position: relative; overflow: visible; }
 .bar-fill.sentiment { position: absolute; top: 0; height: 100%; border-radius: 2px; min-width: 3px; }
-.bar-val { color: #555; font-weight: 600; min-width: 32px; text-align: right; }
+.bar-val { color: #888; font-weight: 600; min-width: 32px; text-align: right; }
 
 .schedule-badge {
   background: #1a1a2e;
@@ -1323,11 +1323,11 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #FFF;
+  background: #1a1a2e;
   padding: 8px 14px;
   border-radius: 20px;
-  border: 1px solid #E0E0E0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  border: 1px solid #2e2e42;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   z-index: 10;
 }
 
@@ -1378,7 +1378,7 @@ input:checked + .slider:before {
 
 .toggle-label {
   font-size: 12px;
-  color: #666;
+  color: #888;
 }
 
 /* Detail Panel - Right Side */
@@ -1388,10 +1388,10 @@ input:checked + .slider:before {
   right: 20px;
   width: 360px;
   max-height: calc(100% - 100px);
-  background: #FFF;
-  border: 1px solid #EAEAEA;
+  background: #1a1a2e;
+  border: 1px solid #2e2e42;
   border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   overflow: hidden;
   font-family: 'Noto Sans SC', system-ui, sans-serif;
   font-size: 13px;
@@ -1405,14 +1405,14 @@ input:checked + .slider:before {
   justify-content: space-between;
   align-items: center;
   padding: 14px 16px;
-  background: #FAFAFA;
-  border-bottom: 1px solid #EEE;
+  background: #13131f;
+  border-bottom: 1px solid #2e2e42;
   flex-shrink: 0;
 }
 
 .detail-title {
   font-weight: 600;
-  color: #333;
+  color: #e0e0e0;
   font-size: 14px;
 }
 
@@ -1430,14 +1430,14 @@ input:checked + .slider:before {
   border: none;
   font-size: 20px;
   cursor: pointer;
-  color: #999;
+  color: #888;
   line-height: 1;
   padding: 0;
   transition: color 0.2s;
 }
 
 .detail-close:hover {
-  color: #333;
+  color: #e0e0e0;
 }
 
 .detail-content {
@@ -1461,7 +1461,7 @@ input:checked + .slider:before {
 }
 
 .detail-value {
-  color: #333;
+  color: #e0e0e0;
   flex: 1;
   word-break: break-word;
 }
@@ -1469,24 +1469,24 @@ input:checked + .slider:before {
 .detail-value.uuid-text {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  color: #666;
+  color: #888;
 }
 
 .detail-value.fact-text {
   line-height: 1.5;
-  color: #444;
+  color: #ccc;
 }
 
 .detail-section {
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid #F0F0F0;
+  border-top: 1px solid #2e2e42;
 }
 
 .section-title {
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: #888;
   margin-bottom: 10px;
 }
 
@@ -1508,13 +1508,13 @@ input:checked + .slider:before {
 }
 
 .property-value {
-  color: #333;
+  color: #e0e0e0;
   flex: 1;
 }
 
 .summary-text {
   line-height: 1.6;
-  color: #444;
+  color: #ccc;
   font-size: 12px;
 }
 
@@ -1527,11 +1527,11 @@ input:checked + .slider:before {
 .label-tag {
   display: inline-block;
   padding: 4px 12px;
-  background: #F5F5F5;
-  border: 1px solid #E0E0E0;
+  background: #1a1a2e;
+  border: 1px solid #2e2e42;
   border-radius: 16px;
   font-size: 11px;
-  color: #555;
+  color: #888;
 }
 
 .episodes-list {
@@ -1543,24 +1543,24 @@ input:checked + .slider:before {
 .episode-tag {
   display: inline-block;
   padding: 6px 10px;
-  background: #F8F8F8;
-  border: 1px solid #E8E8E8;
+  background: #1a1a2e;
+  border: 1px solid #2e2e42;
   border-radius: 6px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
-  color: #666;
+  color: #888;
   word-break: break-all;
 }
 
 /* Edge relation header */
 .edge-relation-header {
-  background: #F8F8F8;
+  background: #13131f;
   padding: 12px;
   border-radius: 8px;
   margin-bottom: 16px;
   font-size: 13px;
   font-weight: 500;
-  color: #333;
+  color: #ccc;
   line-height: 1.5;
   word-break: break-word;
 }
@@ -1653,7 +1653,7 @@ input:checked + .slider:before {
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #E0E0E0;
+  border: 3px solid #2e2e42;
   border-top-color: #7B2D8E;
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -1665,15 +1665,15 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 100%);
-  border: 1px solid #C8E6C9;
+  background: linear-gradient(135deg, #0f1a12 0%, #0f1a10 100%);
+  border: 1px solid #1a3a1e;
 }
 
 .self-loop-count {
   margin-left: auto;
   font-size: 11px;
-  color: #666;
-  background: rgba(255,255,255,0.8);
+  color: #888;
+  background: rgba(26,26,46,0.8);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -1685,8 +1685,8 @@ input:checked + .slider:before {
 }
 
 .self-loop-item {
-  background: #FAFAFA;
-  border: 1px solid #EAEAEA;
+  background: #13131f;
+  border: 1px solid #2e2e42;
   border-radius: 8px;
 }
 
@@ -1695,24 +1695,24 @@ input:checked + .slider:before {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #F5F5F5;
+  background: #1a1a2e;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .self-loop-item-header:hover {
-  background: #EEEEEE;
+  background: #2a2a3e;
 }
 
 .self-loop-item.expanded .self-loop-item-header {
-  background: #E8E8E8;
+  background: #2a2a3e;
 }
 
 .self-loop-index {
   font-size: 10px;
   font-weight: 600;
   color: #888;
-  background: #E0E0E0;
+  background: #2e2e42;
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -1720,7 +1720,7 @@ input:checked + .slider:before {
 .self-loop-name {
   font-size: 12px;
   font-weight: 500;
-  color: #333;
+  color: #ccc;
   flex: 1;
 }
 
@@ -1733,19 +1733,19 @@ input:checked + .slider:before {
   font-size: 14px;
   font-weight: 600;
   color: #888;
-  background: #E0E0E0;
+  background: #2e2e42;
   border-radius: 4px;
   transition: all 0.2s;
 }
 
 .self-loop-item.expanded .self-loop-toggle {
-  background: #D0D0D0;
-  color: #666;
+  background: #3e3e56;
+  color: #ccc;
 }
 
 .self-loop-item-content {
   padding: 12px;
-  border-top: 1px solid #EAEAEA;
+  border-top: 1px solid #2e2e42;
 }
 
 .self-loop-item-content .detail-row {

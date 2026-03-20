@@ -25,6 +25,24 @@ from .oasis_profile_generator import (
 
 logger = get_logger('mirofish.description_profile_generator')
 
+_US_AREA_CODES = [212, 310, 415, 206, 312, 713, 404, 617, 305, 503, 720, 512, 214, 303, 702]
+
+_FALLBACK_NAMES = [
+    "Alex Morgan", "Jordan Lee", "Sam Rivera", "Casey Chen", "Riley Kim",
+    "Morgan Davis", "Taylor Smith", "Drew Johnson", "Quinn Martinez", "Blake Wilson",
+    "Avery Brown", "Parker Thomas", "Cameron White", "Skyler Harris", "Jamie Clark",
+]
+
+
+def _generate_phone_pool(count: int) -> list:
+    """Generate a pool of unique realistic US phone numbers."""
+    phones: set = set()
+    while len(phones) < count:
+        area = random.choice(_US_AREA_CODES)
+        number = random.randint(1000000, 9999999)
+        phones.add(f"+1{area}{number}")
+    return list(phones)
+
 
 class DescriptionProfileGenerator:
     """
@@ -115,7 +133,7 @@ class DescriptionProfileGenerator:
                 fallback = OasisAgentProfile(
                     user_id=uid,
                     user_name=f"user_{group.name}_{within_idx}_{random.randint(100,999)}",
-                    name=f"User {group.name} {within_idx}",
+                    name=_FALLBACK_NAMES[within_idx % len(_FALLBACK_NAMES)],
                     bio=f"{group.label}: {group.behavior_description[:100]}",
                     persona=f"A {group.label.lower()} who {group.behavior_description}",
                     source_entity_uuid=f"scenario_{group.name}_{within_idx}",
@@ -194,7 +212,13 @@ class DescriptionProfileGenerator:
         # Final save to ensure completeness
         save_realtime()
 
-        return [p for p in profiles if p is not None]
+        # Assign unique realistic phone numbers to all profiles
+        valid_profiles = [p for p in profiles if p is not None]
+        phone_pool = _generate_phone_pool(len(valid_profiles))
+        for profile, phone in zip(valid_profiles, phone_pool):
+            profile.phone_number = phone
+
+        return valid_profiles
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -204,7 +228,7 @@ class DescriptionProfileGenerator:
         self, user_id: int, group: AgentGroup, within_idx: int
     ) -> OasisAgentProfile:
         """Generate a single agent profile for one member of a group."""
-        entity_name = f"User_{group.name}_{within_idx}"
+        entity_name = f"agent_{group.name}_{within_idx}"
         entity_type = group.name
 
         # Build group context that gets prepended to the entity summary
@@ -255,11 +279,12 @@ class DescriptionProfileGenerator:
                 if not data.get("persona"):
                     data["persona"] = f"A {group.label.lower()} who {group.behavior_description}"
 
-                user_name = self._generate_username(entity_name)
+                llm_name = data.get("name", entity_name)
+                user_name = self._generate_username(llm_name)
                 return OasisAgentProfile(
                     user_id=user_id,
                     user_name=user_name,
-                    name=data.get("name", entity_name),
+                    name=llm_name,
                     bio=data.get("bio", ""),
                     persona=data.get("persona", ""),
                     karma=data.get("karma", random.randint(100, 3000)),
@@ -293,7 +318,7 @@ class DescriptionProfileGenerator:
         self, user_id: int, group: AgentGroup, within_idx: int
     ) -> OasisAgentProfile:
         """Generate a minimal rule-based profile when LLM fails."""
-        name = f"User_{group.name}_{within_idx}"
+        name = _FALLBACK_NAMES[within_idx % len(_FALLBACK_NAMES)]
         return OasisAgentProfile(
             user_id=user_id,
             user_name=self._generate_username(name),

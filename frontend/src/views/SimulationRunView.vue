@@ -8,15 +8,8 @@
       
       <div class="header-center">
         <div class="view-switcher">
-          <button
-            v-for="mode in ['graph', 'split', 'workbench', 'sms']"
-            :key="mode"
-            class="switch-btn"
-            :class="{ active: viewMode === mode }"
-            @click="viewMode = mode"
-          >
-            {{ { graph: 'Graph', split: 'Split', workbench: 'Workbench', sms: 'SMS Inbox' }[mode] }}
-          </button>
+          <button class="switch-btn" :class="{ active: viewMode === 'graph' }" @click="viewMode = 'graph'">Graph</button>
+          <button class="switch-btn" :class="{ active: viewMode === 'sms' }" @click="viewMode = 'sms'">SMS Inbox</button>
         </div>
       </div>
 
@@ -35,8 +28,8 @@
 
     <!-- Main Content Area -->
     <main class="content-area">
-      <!-- SMS Inbox Panel -->
-      <div v-if="viewMode === 'sms'" class="panel-wrapper sms-full">
+      <!-- SMS Inbox Panel (full width) -->
+      <div v-if="viewMode === 'sms'" class="panel-sms-full">
         <SmsInboxPanel
           :simulation-id="currentSimulationId"
           :is-running="isSimulating"
@@ -44,8 +37,8 @@
       </div>
 
       <template v-else>
-        <!-- Left Panel: Graph -->
-        <div class="panel-wrapper left" :style="leftPanelStyle">
+        <!-- Graph Panel -->
+        <div class="panel-graph">
           <GraphPanel
             :graphData="graphData"
             :loading="graphLoading"
@@ -54,12 +47,11 @@
             :clustered="isDescriptionFlow"
             :recentActions="latestActions"
             @refresh="refreshGraph"
-            @toggle-maximize="toggleMaximize('graph')"
           />
         </div>
 
-        <!-- Right Panel: Step3 Simulation -->
-        <div class="panel-wrapper right" :style="rightPanelStyle">
+        <!-- Controls Sidebar -->
+        <div class="panel-controls">
           <Step3Simulation
             :simulationId="currentSimulationId"
             :maxRounds="maxRounds"
@@ -97,7 +89,7 @@ const props = defineProps({
 })
 
 // Layout State
-const viewMode = ref('sms')
+const viewMode = ref('graph')
 
 // Data State
 const currentSimulationId = ref(route.params.simulationId)
@@ -114,19 +106,6 @@ let seenActionCount = 0
 let actionPollTimer = null
 const systemLogs = ref([])
 const currentStatus = ref('processing') // processing | completed | error
-
-// --- Computed Layout Styles ---
-const leftPanelStyle = computed(() => {
-  if (viewMode.value === 'graph') return { width: '100%', opacity: 1, transform: 'translateX(0)' }
-  if (viewMode.value === 'workbench') return { width: '0%', opacity: 0, transform: 'translateX(-20px)' }
-  return { width: '50%', opacity: 1, transform: 'translateX(0)' }
-})
-
-const rightPanelStyle = computed(() => {
-  if (viewMode.value === 'workbench') return { width: '100%', opacity: 1, transform: 'translateX(0)' }
-  if (viewMode.value === 'graph') return { width: '0%', opacity: 0, transform: 'translateX(20px)' }
-  return { width: '50%', opacity: 1, transform: 'translateX(0)' }
-})
 
 // --- Status Computed ---
 const statusClass = computed(() => {
@@ -152,15 +131,6 @@ const addLog = (msg) => {
 
 const updateStatus = (status) => {
   currentStatus.value = status
-}
-
-// --- Layout Methods ---
-const toggleMaximize = (target) => {
-  if (viewMode.value === target) {
-    viewMode.value = 'split'
-  } else {
-    viewMode.value = target
-  }
 }
 
 const handleGoBack = async () => {
@@ -511,7 +481,7 @@ onUnmounted(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #FFF;
+  background: #0f0f1a;
   overflow: hidden;
   font-family: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
 }
@@ -519,14 +489,15 @@ onUnmounted(() => {
 /* Header */
 .app-header {
   height: 60px;
-  border-bottom: 1px solid #EAEAEA;
+  border-bottom: 1px solid #1e1e2e;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  background: #FFF;
+  background: #13131f;
   z-index: 100;
   position: relative;
+  flex-shrink: 0;
 }
 
 .header-center {
@@ -541,11 +512,12 @@ onUnmounted(() => {
   font-size: 18px;
   letter-spacing: 1px;
   cursor: pointer;
+  color: #e0e0e0;
 }
 
 .view-switcher {
   display: flex;
-  background: #F5F5F5;
+  background: #1a1a2e;
   padding: 4px;
   border-radius: 6px;
   gap: 4px;
@@ -557,16 +529,16 @@ onUnmounted(() => {
   padding: 6px 16px;
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: #888;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .switch-btn.active {
-  background: #FFF;
-  color: #000;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  background: #2a2a3e;
+  color: #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .header-right {
@@ -585,18 +557,18 @@ onUnmounted(() => {
 .step-num {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
-  color: #999;
+  color: #555;
 }
 
 .step-name {
   font-weight: 700;
-  color: #000;
+  color: #e0e0e0;
 }
 
 .step-divider {
   width: 1px;
   height: 14px;
-  background-color: #E0E0E0;
+  background-color: #1e1e2e;
 }
 
 .status-indicator {
@@ -604,7 +576,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #666;
+  color: #888;
   font-weight: 500;
 }
 
@@ -612,7 +584,7 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #CCC;
+  background: #555;
 }
 
 .status-indicator.processing .dot { background: #FF5722; animation: pulse 1s infinite; }
@@ -629,23 +601,29 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.panel-wrapper {
+/* SMS full-width mode */
+.panel-sms-full {
+  width: 100%;
   height: 100%;
   overflow: hidden;
-  transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease, transform 0.3s ease;
-  will-change: width, opacity, transform;
-}
-
-.panel-wrapper.left {
-  border-right: 1px solid #EAEAEA;
-}
-
-.panel-wrapper.sms-full {
-  width: 100%;
   padding: 16px;
   box-sizing: border-box;
+  background: #0f0f1a;
 }
 
+/* Graph + controls layout */
+.panel-graph {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  border-right: 1px solid #1e1e2e;
+}
 
+.panel-controls {
+  width: 480px;
+  flex-shrink: 0;
+  height: 100%;
+  overflow: hidden;
+}
 </style>
 

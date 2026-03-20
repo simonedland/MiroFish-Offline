@@ -1,29 +1,30 @@
 FROM python:3.11
 
-# 安装 Node.js （满足 >=18）及必要工具
+# Install Node.js 22 LTS via NodeSource (Vite 7 requires Node >= 20)
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends nodejs npm \
+  && apt-get install -y --no-install-recommends curl ca-certificates \
+  && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+  && apt-get install -y --no-install-recommends nodejs \
   && rm -rf /var/lib/apt/lists/*
 
-# 从 uv 官方镜像复制 uv
-COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
+# Copy uv from official image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# 先复制依赖描述文件以利用缓存
+# Copy dependency files first to maximise layer caching
 COPY package.json package-lock.json ./
 COPY frontend/package.json frontend/package-lock.json ./frontend/
 COPY backend/pyproject.toml backend/uv.lock ./backend/
 
-# 安装依赖（Node + Python）
+# Install all dependencies (Node root + frontend + Python backend)
 RUN npm ci \
   && npm ci --prefix frontend \
   && cd backend && uv sync
 
-# 复制项目源码
+# Copy project source
 COPY . .
 
 EXPOSE 3000 5001
 
-# 同时启动前后端（开发模式）
 CMD ["npm", "run", "dev"]

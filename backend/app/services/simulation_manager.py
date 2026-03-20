@@ -16,6 +16,7 @@ from ..config import Config
 from ..utils.logger import get_logger
 from .entity_reader import EntityReader, FilteredEntities
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
+from .description_profile_generator import _generate_phone_pool
 from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
 
 logger = get_logger('mirofish.simulation')
@@ -725,7 +726,7 @@ class SimulationManager:
                 name=p.get("name", ""),
                 bio=p.get("bio", ""),
                 persona=p.get("persona", ""),
-                phone_number=p.get("phone_number") or f"+1555{uid:04d}",
+                phone_number=p.get("phone_number") or _generate_phone_pool(1)[0],
                 karma=p.get("karma", 1000),
                 age=p.get("age"),
                 gender=p.get("gender"),
@@ -784,10 +785,39 @@ class SimulationManager:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
+                # Auto-generate relationships if not yet cached (e.g. simulation started
+                # before the frontend's graph-build request triggered generation).
+                actual_relationships = relationships
+                if not actual_relationships:
+                    logger.info(
+                        "SMS simulation %s: relationships_ai.json missing or empty, "
+                        "generating now…",
+                        simulation_id,
+                    )
+                    try:
+                        from .relationship_generator import RelationshipGenerator
+                        groups: list = []
+                        scenario_path = os.path.join(sim_dir, "scenario_definition.json")
+                        if os.path.exists(scenario_path):
+                            with open(scenario_path, "r", encoding="utf-8") as _sf:
+                                groups = _json.loads(_sf.read()).get("groups", [])
+                        gen = RelationshipGenerator()
+                        actual_relationships = gen.generate(sim_dir, raw_profiles, groups)
+                        logger.info(
+                            "SMS simulation %s: generated %d relationships",
+                            simulation_id, len(actual_relationships),
+                        )
+                    except Exception as _rel_exc:
+                        logger.warning(
+                            "SMS simulation %s: relationship generation failed (%s), "
+                            "proceeding with empty graph",
+                            simulation_id, _rel_exc,
+                        )
+
                 runner = SmsSimulationRunner(
                     simulation_id=simulation_id,
                     profiles=profiles,
-                    relationships=relationships,
+                    relationships=actual_relationships,
                     config={"total_rounds": total_rounds},
                 )
                 loop.run_until_complete(runner.run())

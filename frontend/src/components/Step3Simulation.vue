@@ -32,7 +32,7 @@
       <div class="action-controls">
         <button 
           class="action-btn primary"
-          :disabled="phase !== 2 || isGeneratingReport"
+          :disabled="isGeneratingReport"
           @click="handleNextStep"
         >
           <span v-if="isGeneratingReport" class="loading-spinner-small"></span>
@@ -730,21 +730,24 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #FFFFFF;
+  background: #13131f;
   font-family: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
   overflow: hidden;
+  color: #e0e0e0;
 }
 
 /* --- Control Bar --- */
 .control-bar {
-  background: #FFF;
-  padding: 12px 24px;
+  background: #13131f;
+  padding: 12px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #EAEAEA;
+  border-bottom: 1px solid #1e1e2e;
   z-index: 10;
-  height: 64px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .status-group {
@@ -759,25 +762,25 @@ onUnmounted(() => {
   gap: 4px;
   padding: 6px 12px;
   border-radius: 4px;
-  background: #FAFAFA;
-  border: 1px solid #EAEAEA;
+  background: #1a1a2e;
+  border: 1px solid #2e2e42;
   opacity: 0.7;
   transition: all 0.3s;
-  min-width: 140px;
+  min-width: 120px;
   position: relative;
   cursor: pointer;
 }
 
 .platform-status.active {
   opacity: 1;
-  border-color: #333;
-  background: #FFF;
+  border-color: #3e3e56;
+  background: #1a1a2e;
 }
 
 .platform-status.completed {
   opacity: 1;
   border-color: #1A936F;
-  background: #F2FAF6;
+  background: #0a1f14;
 }
 
 /* Actions Tooltip */
@@ -851,13 +854,13 @@ onUnmounted(() => {
 .platform-name {
   font-size: 11px;
   font-weight: 700;
-  color: #000;
+  color: #e0e0e0;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.platform-status.twitter .platform-icon { color: #000; }
-.platform-status.reddit .platform-icon { color: #000; }
+.platform-status.twitter .platform-icon { color: #888; }
+.platform-status.reddit .platform-icon { color: #888; }
 
 .platform-stats {
   display: flex;
@@ -881,7 +884,7 @@ onUnmounted(() => {
 .stat-value {
   font-size: 11px;
   font-weight: 600;
-  color: #333;
+  color: #e0e0e0;
 }
 
 .stat-total, .stat-unit {
@@ -914,12 +917,12 @@ onUnmounted(() => {
 }
 
 .action-btn.primary {
-  background: #000;
-  color: #FFF;
+  background: #1a3a6a;
+  color: #d0e4ff;
 }
 
 .action-btn.primary:hover:not(:disabled) {
-  background: #333;
+  background: #1e4a8a;
 }
 
 .action-btn:disabled {
@@ -932,7 +935,7 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   position: relative;
-  background: #FFF;
+  background: #0f0f1a;
 }
 
 .main-content-area.sms-mode {

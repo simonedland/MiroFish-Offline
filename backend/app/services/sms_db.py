@@ -110,6 +110,47 @@ def get_thread(simulation_id: str, phone_a: str, phone_b: str, limit: int = 20) 
     finally:
         conn.close()
 
+def get_recent_community_messages(simulation_id: str, limit: int = 8) -> list:
+    """Recent messages from all agents across all threads, newest first."""
+    db_path = _get_db_path(simulation_id)
+    if not os.path.exists(db_path):
+        return []
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT sender_name, receiver_name, content FROM sms_messages
+               WHERE simulation_id = ?
+               ORDER BY timestamp DESC LIMIT ?""",
+            (simulation_id, limit)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_agent_recent_messages(simulation_id: str, phone: str, limit: int = 5) -> list:
+    """Recent messages where this agent is sender or receiver, across all threads."""
+    db_path = _get_db_path(simulation_id)
+    if not os.path.exists(db_path):
+        return []
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT sender_name, receiver_name, content FROM sms_messages
+               WHERE simulation_id = ?
+                 AND (sender_phone = ? OR receiver_phone = ?)
+               ORDER BY timestamp DESC LIMIT ?""",
+            (simulation_id, phone, phone, limit)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
 def get_all_threads_for_agent(simulation_id: str, phone: str) -> list:
     """Get all conversation partners for a given phone number with last message."""
     db_path = _get_db_path(simulation_id)
@@ -167,5 +208,67 @@ def get_messages_by_round(simulation_id: str, phone_a: str, phone_b: str, round_
             (simulation_id, phone_a, phone_b, phone_b, phone_a, round_num)
         )
         return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_all_messages(simulation_id: str, limit: int = 500) -> list:
+    """All messages for a simulation, ordered chronologically (for report analysis)."""
+    db_path = _get_db_path(simulation_id)
+    if not os.path.exists(db_path):
+        return []
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT sender_name, receiver_name, content, round_num
+               FROM sms_messages
+               WHERE simulation_id = ?
+               ORDER BY timestamp ASC
+               LIMIT ?""",
+            (simulation_id, limit)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_message_stats(simulation_id: str) -> dict:
+    """Per-agent message counts, total messages, and round range (for report analysis)."""
+    db_path = _get_db_path(simulation_id)
+    if not os.path.exists(db_path):
+        return {}
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT sender_name, COUNT(*) as sent FROM sms_messages WHERE simulation_id = ? GROUP BY sender_name ORDER BY sent DESC",
+            (simulation_id,)
+        )
+        sent_counts = {row['sender_name']: row['sent'] for row in cursor.fetchall()}
+
+        cursor.execute(
+            "SELECT receiver_name, COUNT(*) as received FROM sms_messages WHERE simulation_id = ? GROUP BY receiver_name ORDER BY received DESC",
+            (simulation_id,)
+        )
+        recv_counts = {row['receiver_name']: row['received'] for row in cursor.fetchall()}
+
+        cursor.execute(
+            "SELECT COUNT(*) as total, MIN(round_num) as min_round, MAX(round_num) as max_round FROM sms_messages WHERE simulation_id = ?",
+            (simulation_id,)
+        )
+        row = cursor.fetchone()
+        total = row['total'] if row else 0
+        min_round = row['min_round'] if row else 0
+        max_round = row['max_round'] if row else 0
+
+        all_agents = set(sent_counts) | set(recv_counts)
+        per_agent = {
+            name: {"sent": sent_counts.get(name, 0), "received": recv_counts.get(name, 0)}
+            for name in all_agents
+        }
+        return {"total_messages": total, "rounds": {"min": min_round, "max": max_round}, "per_agent": per_agent}
     finally:
         conn.close()

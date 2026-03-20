@@ -9,7 +9,9 @@ Results are cached to relationships_ai.json in the simulation dir.
 import json
 import logging
 import os
+import re
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Optional
 
@@ -215,13 +217,30 @@ class RelationshipGenerator:
         staged_buffer: List[Dict] = []
 
         for turn in range(MAX_TURNS):
-            resp = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                tools=tools,
-                tool_choice="auto",
-                temperature=0.7,
-            )
+            resp = None
+            for attempt in range(4):
+                try:
+                    resp = self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages,
+                        tools=tools,
+                        tool_choice="auto",
+                        temperature=0.7,
+                    )
+                    break
+                except Exception as exc:
+                    exc_str = str(exc)
+                    if "429" in exc_str or "RateLimitReached" in exc_str:
+                        wait = 5 * (2 ** attempt)
+                        m = re.search(r"retry after (\d+) second", exc_str, re.IGNORECASE)
+                        if m:
+                            wait = int(m.group(1)) + 1
+                        logger.warning("Rate limited, waiting %ds (attempt %d/4)", wait, attempt + 1)
+                        time.sleep(wait)
+                    else:
+                        raise
+            if resp is None:
+                raise RuntimeError("LLM call failed after 4 rate-limit retries")
             msg = resp.choices[0].message
 
             # Build a serialisable dict for the assistant turn
@@ -299,7 +318,17 @@ class RelationshipGenerator:
                     profile, groups, profiles_by_id, shared_graph, graph_lock
                 )
                 with graph_lock:
-                    shared_graph.extend(staged)
+                    existing_typed = {
+                        (min(e["src_id"], e["tgt_id"]), max(e["src_id"], e["tgt_id"]), e["type"])
+                        for e in shared_graph
+                    }
+                    deduped = []
+                    for edge in staged:
+                        key = (min(edge["src_id"], edge["tgt_id"]), max(edge["src_id"], edge["tgt_id"]), edge["type"])
+                        if key not in existing_typed:
+                            deduped.append(edge)
+                            existing_typed.add(key)
+                    shared_graph.extend(deduped)
                     graph_size = len(shared_graph)
                 logger.info(f"Agent {uid} declared {len(staged)} relationship(s); graph total: {graph_size}")
                 return False
