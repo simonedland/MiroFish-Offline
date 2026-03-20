@@ -480,7 +480,7 @@ const startSmsPoll = () => {
   smsPollTimer = setInterval(async () => {
     try {
       const res = await getSmsEvents(currentSimulationId.value, lastSmsTimestamp)
-      const events = res.data?.data || []
+      const events = res.data || []
       if (!events.length) return
 
       const newActions = []
