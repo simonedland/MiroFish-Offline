@@ -441,7 +441,7 @@ const processNewActions = (actions) => {
   if (actions.length <= seenActionCount) return
   const fresh = actions.slice(seenActionCount)
   seenActionCount = actions.length
-  latestActions.value = [
+  const combined = [
     ...latestActions.value,
     ...fresh.map(a => {
       const srcId = `agent_${a.agent_id}`
@@ -454,6 +454,7 @@ const processNewActions = (actions) => {
       return { srcId, tgtId, type: (a.action_type || '').toUpperCase() }
     }).filter(a => a.srcId)
   ]
+  latestActions.value = combined.slice(-50)
 }
 
 const startActionPoll = () => {
@@ -502,7 +503,7 @@ const startSmsPoll = () => {
       })
 
       if (newActions.length) {
-        latestActions.value = [...latestActions.value, ...newActions]
+        latestActions.value = [...latestActions.value, ...newActions].slice(-50)
       }
     } catch (_) {}
   }, 4000)
@@ -686,7 +687,7 @@ onUnmounted(() => {
 }
 
 .panel-controls {
-  width: 480px;
+  width: 600px;
   flex-shrink: 0;
   height: 100%;
   overflow: hidden;
