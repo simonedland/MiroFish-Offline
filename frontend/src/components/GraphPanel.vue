@@ -337,7 +337,7 @@ const props = defineProps({
   recentActions: { type: Array, default: () => [] },  // [{srcId, tgtId?, type}]
 })
 
-const emit = defineEmits(['refresh', 'toggle-maximize'])
+const emit = defineEmits(['refresh', 'toggle-maximize', 'node-click'])
 
 const graphContainer = ref(null)
 const graphSvg = ref(null)
@@ -869,6 +869,7 @@ const renderGraph = () => {
         entityType: d.type,
         color: getColor(d.type)
       }
+      emit('node-click', { name: d.rawData.name, uuid: d.rawData.uuid, entityType: d.type })
     })
     .on('mouseenter', (event, d) => {
       if (!selectedItem.value || selectedItem.value.data?.uuid !== d.rawData.uuid) {

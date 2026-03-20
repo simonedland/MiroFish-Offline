@@ -47,6 +47,7 @@
             :clustered="isDescriptionFlow"
             :recentActions="latestActions"
             @refresh="refreshGraph"
+            @node-click="handleNodeClick"
           />
         </div>
 
@@ -59,6 +60,7 @@
             :projectData="projectData"
             :graphData="graphData"
             :systemLogs="systemLogs"
+            :selectedAgentName="selectedAgentName"
             @go-back="handleGoBack"
             @next-step="handleNextStep"
             @add-log="addLog"
@@ -91,6 +93,12 @@ const props = defineProps({
 
 // Layout State
 const viewMode = ref('graph')
+const selectedAgentName = ref(null)
+
+function handleNodeClick({ name }) {
+  // Use object so re-clicking the same node still triggers the watch
+  selectedAgentName.value = { name, ts: Date.now() }
+}
 
 // Data State
 const currentSimulationId = ref(route.params.simulationId)
@@ -460,7 +468,7 @@ const startActionPoll = () => {
       const res = await getRunStatusDetail(currentSimulationId.value)
       processNewActions(res.data?.all_actions || [])
     } catch (_) {}
-  }, 4000)
+  }, 500)
 }
 
 const stopActionPoll = () => {
@@ -502,7 +510,7 @@ const startSmsPoll = () => {
         latestActions.value = newActions
       }
     } catch (_) {}
-  }, 4000)
+  }, 500)
 }
 
 const stopSmsPoll = () => {
@@ -683,7 +691,7 @@ onUnmounted(() => {
 }
 
 .panel-controls {
-  width: 600px;
+  width: 800px;
   flex-shrink: 0;
   height: 100%;
   overflow: hidden;

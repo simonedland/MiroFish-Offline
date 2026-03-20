@@ -1,4 +1,4 @@
-The 10 SMS Agents
+The 15 SMS Agents
 
 A small SMS network of ten people. Most are completely ordinary. Their texts reflect daily routines, habits, relationships, and timing patterns. Some message constantly, others only in bursts. Over time, each develops a distinct rhythm.
 
@@ -38,6 +38,7 @@ Barely active during the day, then highly active in the evening. Messages are ab
 
 Routine-driven and upbeat. Messages about workouts, step counts, class times, meal prep, recovery, and whether someone is joining the gym session. Fairly consistent rhythm, with activity tending to stop early at night.
 
-10. The Bad Actor
+10. The Drug Network 6X
 
-At first glance, seems ordinary enough. Friendly tone, short check-ins, occasional practical messages. But over time, their pattern stands out. They contact a narrower set of people, often at specific times, and their wording is more indirect than everyone else’s. They avoid detail, rarely explain context, and their message timing feels more deliberate than spontaneous. Nothing obvious on its own — just enough to feel slightly off when viewed as part of the whole network.
+At first glance, seems ordinary enough. Friendly tone, short check-ins, occasional practical messages. But over time, their pattern stands out. They contact a narrower set of people, often at specific times, and their wording is more indirect than everyone else’s. They avoid detail, rarely explain context, and their message timing feels more deliberate than spontaneous. Nothing obvious on its own — just enough to feel slightly off when viewed as part of the whole network. they are strongly connected to each other, but only weakly connected to the rest of the network. They often message late at night or early in the morning, and their messages are more likely to be vague check-ins or cryptic questions rather than direct statements or plans.
+make shure to give them diffrennt roles in the drug network, such as supplier, distributor, or customer, to create a more complex and realistic web of relationships.

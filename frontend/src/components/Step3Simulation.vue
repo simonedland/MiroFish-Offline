@@ -47,6 +47,7 @@
       <SmsInboxPanel
         :simulation-id="simulationId"
         :is-running="phase === 1"
+        :selected-agent-name="selectedAgentName"
       />
     </div>
 
@@ -288,7 +289,8 @@ const props = defineProps({
   },
   projectData: Object,
   graphData: Object,
-  systemLogs: Array
+  systemLogs: Array,
+  selectedAgentName: { type: Object, default: null }
 })
 
 const emit = defineEmits(['go-back', 'next-step', 'add-log', 'update-status'])

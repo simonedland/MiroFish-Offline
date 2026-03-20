@@ -129,7 +129,8 @@ import { getAgents, getThreads, getThread } from '../api/sms.js'
 
 const props = defineProps({
   simulationId: { type: String, required: true },
-  isRunning: { type: Boolean, default: false }
+  isRunning: { type: Boolean, default: false },
+  selectedAgentName: { type: Object, default: null }
 })
 
 const agents = ref([])
@@ -199,10 +200,10 @@ async function loadContacts() {
 
 async function selectContact(contact) {
   selectedContact.value = contact
-  await loadThread()
+  await loadThread(true)
 }
 
-async function loadThread() {
+async function loadThread(force = false) {
   if (!selectedAgent.value || !selectedContact.value) return
   try {
     const res = await getThread(
@@ -213,16 +214,19 @@ async function loadThread() {
     if (res.success) {
       messages.value = res.data
       await nextTick()
-      scrollToBottom()
+      scrollToBottom(force)
     }
   } catch (e) {
     console.error('Failed to load thread', e)
   }
 }
 
-function scrollToBottom() {
-  if (threadContainer.value) {
-    threadContainer.value.scrollTop = threadContainer.value.scrollHeight
+function scrollToBottom(force = false) {
+  const el = threadContainer.value
+  if (!el) return
+  const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+  if (force || distFromBottom < 120) {
+    el.scrollTop = el.scrollHeight
   }
 }
 
@@ -232,7 +236,7 @@ function startPolling() {
     await loadAgents()
     if (selectedAgent.value) await loadContacts()
     if (selectedContact.value) await loadThread()
-  }, 3000)
+  }, 500)
 }
 
 function stopPolling() {
@@ -246,6 +250,29 @@ watch(() => props.isRunning, (running) => {
   if (running) startPolling()
   else stopPolling()
 }, { immediate: true })
+
+const resolvedAgentName = ref(null)
+
+function trySelectAgentByName(name) {
+  if (!name || resolvedAgentName.value === name) return
+  const match = agents.value.find(a => a.username === name || a.name === name)
+  if (match) {
+    resolvedAgentName.value = name
+    selectAgent(match)
+  }
+}
+
+watch(() => props.selectedAgentName, (val) => {
+  resolvedAgentName.value = null  // reset so new selection always fires
+  if (val?.name) trySelectAgentByName(val.name)
+})
+
+// Only try once when agents first become available (handles timing race)
+watch(agents, (newAgents, oldAgents) => {
+  if (oldAgents.length === 0 && newAgents.length > 0 && props.selectedAgentName?.name) {
+    trySelectAgentByName(props.selectedAgentName.name)
+  }
+})
 
 onMounted(loadAgents)
 onUnmounted(stopPolling)

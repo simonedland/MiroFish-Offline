@@ -21,6 +21,7 @@ def init_db(simulation_id: str) -> None:
                 simulation_id TEXT NOT NULL,
                 agent_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
+                username TEXT,
                 phone_number TEXT NOT NULL,
                 persona TEXT,
                 PRIMARY KEY (simulation_id, agent_id)
@@ -42,6 +43,12 @@ def init_db(simulation_id: str) -> None:
                 ON sms_messages(simulation_id, sender_phone, receiver_phone);
         """)
         conn.commit()
+        # Migration: add username column to existing DBs
+        try:
+            cursor.execute("ALTER TABLE sms_agents ADD COLUMN username TEXT")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
     finally:
         conn.close()
 
@@ -53,8 +60,8 @@ def register_agents(simulation_id: str, profiles: list) -> None:
         cursor = conn.cursor()
         for profile in profiles:
             cursor.execute(
-                "INSERT OR REPLACE INTO sms_agents (simulation_id, agent_id, name, phone_number, persona) VALUES (?, ?, ?, ?, ?)",
-                (simulation_id, profile.user_id, profile.name, getattr(profile, 'phone_number', ''), profile.persona)
+                "INSERT OR REPLACE INTO sms_agents (simulation_id, agent_id, name, username, phone_number, persona) VALUES (?, ?, ?, ?, ?, ?)",
+                (simulation_id, profile.user_id, profile.name, getattr(profile, 'user_name', ''), getattr(profile, 'phone_number', ''), profile.persona)
             )
         conn.commit()
     finally:

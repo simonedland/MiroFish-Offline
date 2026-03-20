@@ -190,14 +190,7 @@ Please generate JSON containing the following fields:
 
 1. name: A realistic first and last name for this character (e.g. 'Maria Chen', 'James Wilson')
 2. bio: Social media bio, 200 characters
-3. persona: Detailed persona description (2000 words of pure text), must include:
-   - Basic information (age, profession, educational background, location)
-   - Personal background (important experiences, event associations, social relationships)
-   - Personality traits (MBTI type, core personality, emotional expression)
-   - Social media behavior (posting frequency, content preferences, interaction style, language characteristics)
-   - Positions and views (attitudes toward topics, content that may provoke/touch emotions)
-   - Unique features (catchphrases, special experiences, personal interests)
-   - Personal memories (important part of persona, introduce this individual's association with events and their existing actions/reactions in events)
+3. persona: Short persona description in exactly 5 sentences covering: who they are and profession, personality and communication style, social media behavior, key views or stance, and one defining personal trait or memory
 4. age: Age as number (must be integer)
 5. gender: Gender, must be in English: "male" or "female"
 6. mbti: MBTI type (e.g., INTJ, ENFP)

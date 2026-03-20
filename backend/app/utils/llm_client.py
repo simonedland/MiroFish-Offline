@@ -67,7 +67,13 @@ class LLMClient:
         response = self.client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content
         # Some models (like MiniMax M2.5) include <think>thinking content in response, need to remove
-        content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
+        think_match = re.search(r'<think>([\s\S]*?)</think>', content)
+        stripped = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
+        if stripped:
+            return stripped
+        # Entire response was inside <think> tags — return the think content as the answer
+        if think_match:
+            return think_match.group(1).strip()
         return content
 
     def chat_json(

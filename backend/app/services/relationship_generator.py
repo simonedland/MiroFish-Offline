@@ -26,7 +26,7 @@ VALID_TYPES = {
     "INFLUENCES", "TARGETS", "DISPUTES", "AGREES_WITH", "RIVALS",
 }
 
-MAX_TURNS = 10
+MAX_TURNS = 12
 FAILURE_THRESHOLD = 0.5  # raise RuntimeError if more than this fraction of agents fail
 
 
@@ -178,19 +178,28 @@ class RelationshipGenerator:
             return f"error: unknown tool '{tool_name}'"
 
     @staticmethod
+    def _slim_profile(profile: Dict) -> Dict:
+        """Return a compact profile subset sufficient for relationship reasoning."""
+        keep = ("user_id", "username", "user_name", "name", "bio", "group_id",
+                "age", "gender", "mbti", "profession", "country", "interested_topics")
+        return {k: profile[k] for k in keep if k in profile}
+
+    @staticmethod
     def _build_system_prompt(profile: Dict, group_name: str, group_description: str) -> str:
         username = profile.get("username", profile.get("user_name", "agent"))
-        profile_json = json.dumps(profile, ensure_ascii=False, indent=2)
+        profile_json = json.dumps(RelationshipGenerator._slim_profile(profile), ensure_ascii=False, indent=2)
         return (
             f"Simulation character: {username}\n\n"
             f"Profile:\n{profile_json}\n\n"
             f"Group: {group_name} — {group_description}\n\n"
-            "Task: establish social connections for this character before the simulation begins.\n"
-            "Use the available tools to browse other participants and the growing social graph,\n"
-            "then declare the relationships that fit this character's background.\n\n"
-            "Guidance: 2–8 relationships is typical. Fewer for a loner, more for a highly social\n"
-            "character — let the background guide the count, not a desire to maximise connections.\n\n"
-            "When finished declaring relationships, stop calling tools and send a brief closing note."
+            "Task: establish social connections for this character before the simulation begins.\n\n"
+            "Workflow (be efficient — you have a limited number of turns):\n"
+            "1. Call list_agents once to see all participants.\n"
+            "2. Based on the bio snippets, immediately declare relationships for anyone who clearly fits.\n"
+            "3. Only call get_agent_profile if you genuinely need more detail for a specific person.\n"
+            "4. Once you have declared all relationships, stop and send a brief closing note.\n\n"
+            "Guidance: 2–8 relationships is typical. Base decisions on bio snippets — skip deep profile\n"
+            "lookups unless truly necessary. Do not call list_agents or get_full_graph more than once."
         )
 
     def _run_agent_loop(
@@ -218,7 +227,7 @@ class RelationshipGenerator:
 
         for turn in range(MAX_TURNS):
             resp = None
-            for attempt in range(4):
+            for attempt in range(6):
                 try:
                     resp = self.client.chat.completions.create(
                         model=self.model_name,
@@ -231,16 +240,16 @@ class RelationshipGenerator:
                 except Exception as exc:
                     exc_str = str(exc)
                     if "429" in exc_str or "RateLimitReached" in exc_str:
-                        wait = 5 * (2 ** attempt)
+                        wait = 4 * (2 ** attempt)
                         m = re.search(r"retry after (\d+) second", exc_str, re.IGNORECASE)
                         if m:
-                            wait = int(m.group(1)) + 1
-                        logger.warning("Rate limited, waiting %ds (attempt %d/4)", wait, attempt + 1)
+                            wait = max(int(m.group(1)) + 2, wait)
+                        logger.warning("Rate limited, waiting %ds (attempt %d/6)", wait, attempt + 1)
                         time.sleep(wait)
                     else:
                         raise
             if resp is None:
-                raise RuntimeError("LLM call failed after 4 rate-limit retries")
+                raise RuntimeError("LLM call failed after 6 rate-limit retries")
             msg = resp.choices[0].message
 
             # Build a serialisable dict for the assistant turn
@@ -290,7 +299,7 @@ class RelationshipGenerator:
     # Core negotiation loop
     # ------------------------------------------------------------------
 
-    MAX_PARALLEL_AGENTS = 20
+    MAX_PARALLEL_AGENTS = 16
 
     def _negotiate_all(
         self,
@@ -386,7 +395,7 @@ class RelationshipGenerator:
         """get_agent_profile(agent_id) → JSON profile or error."""
         if agent_id not in profiles_by_id:
             return json.dumps({"error": f"agent_id {agent_id} not found"})
-        return json.dumps(profiles_by_id[agent_id])
+        return json.dumps(RelationshipGenerator._slim_profile(profiles_by_id[agent_id]))
 
     @staticmethod
     def _tool_get_full_graph(shared_graph: List[Dict]) -> str:

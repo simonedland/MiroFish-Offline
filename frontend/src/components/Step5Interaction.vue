@@ -829,13 +829,14 @@ const submitSurvey = async () => {
         const agentIdx = interview.agent_id
         const agent = profiles.value[agentIdx]
 
-        // Prefer reddit platform response, then twitter
+        // Prefer reddit platform response, then twitter, then sms
         let responseContent = 'No response'
 
         if (typeof resultsDict === 'object' && !Array.isArray(resultsDict)) {
           const redditKey = `reddit_${agentIdx}`
           const twitterKey = `twitter_${agentIdx}`
-          const agentResult = resultsDict[redditKey] || resultsDict[twitterKey]
+          const smsKey = `sms_${agentIdx}`
+          const agentResult = resultsDict[redditKey] || resultsDict[twitterKey] || resultsDict[smsKey]
           if (agentResult) {
             responseContent = agentResult.response || agentResult.answer || 'No response'
           }

@@ -43,7 +43,7 @@ def get_sms_agents():
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT agent_id, name, phone_number, persona FROM sms_agents WHERE simulation_id = ? ORDER BY agent_id",
+            "SELECT agent_id, name, username, phone_number, persona FROM sms_agents WHERE simulation_id = ? ORDER BY agent_id",
             (simulation_id,)
         )
         agents = [dict(row) for row in cursor.fetchall()]
