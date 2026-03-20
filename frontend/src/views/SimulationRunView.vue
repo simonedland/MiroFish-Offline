@@ -79,6 +79,7 @@ import SmsInboxPanel from '../components/SmsInboxPanel.vue'
 import { getProject, getGraphData } from '../api/graph'
 import { getSimulation, getSimulationConfig, getSimulationProfiles, getSimulationActions, getRunStatusDetail, stopSimulation, closeSimulationEnv, getEnvStatus, getSimulationRelationships } from '../api/simulation'
 import { getSimulationGroups } from '../api/scenario'
+import { getSmsEvents } from '../api/sms'
 
 const route = useRoute()
 const router = useRouter()
@@ -100,10 +101,13 @@ const projectData = ref(null)
 const graphData = ref(null)
 const graphLoading = ref(false)
 const isDescriptionFlow = ref(false)
-const agentNameMap = ref({})    // username.lower → user_id (built by buildAgentGraph)
-const latestActions = ref([])   // [{srcId, tgtId?}] — fed to GraphPanel for animation
+const agentNameMap = ref({})       // username.lower → user_id (built by buildAgentGraph)
+const smsDisplayNameMap = ref({})  // display-name.lower → user_id (for SMS event resolution)
+const latestActions = ref([])      // [{srcId, tgtId?}] — fed to GraphPanel for animation
 let seenActionCount = 0
 let actionPollTimer = null
+let smsPollTimer = null
+let lastSmsTimestamp = 0
 const systemLogs = ref([])
 const currentStatus = ref('processing') // processing | completed | error
 
@@ -186,6 +190,7 @@ const handleNextStep = () => {
 
 // --- Data Logic ---
 const loadSimulationData = async () => {
+  lastSmsTimestamp = 0
   try {
     addLog(`Loading simulation data: ${currentSimulationId.value}`)
 
@@ -279,6 +284,13 @@ const buildAgentGraph = async () => {
     const actions  = actionsRes.status  === 'fulfilled' ? (actionsRes.value.data?.actions || []) : []
 
     if (profiles.length === 0) return
+
+    // Build display-name → user_id map for SMS event resolution
+    smsDisplayNameMap.value = {}
+    profiles.forEach(p => {
+      const n = (p.name || '').toLowerCase()
+      if (n) smsDisplayNameMap.value[n] = p.user_id
+    })
 
     // Build group lookup for node enrichment
     const groupByName = {}
@@ -411,6 +423,12 @@ const buildAgentGraph = async () => {
     graphData.value = { nodes, edges }
     agentNameMap.value = agentByName   // save for action processing
     addLog(`Agent graph: ${nodes.length} nodes, ${edges.length} edges`)
+
+    // Start SMS poll now if simulation is already running
+    // (handles the race where isSimulating fired before buildAgentGraph completed)
+    if (isSimulating.value && !smsPollTimer) {
+      startSmsPoll()
+    }
   } catch (err) {
     addLog(`Agent graph failed: ${err.message}`)
   } finally {
@@ -423,16 +441,19 @@ const processNewActions = (actions) => {
   if (actions.length <= seenActionCount) return
   const fresh = actions.slice(seenActionCount)
   seenActionCount = actions.length
-  latestActions.value = fresh.map(a => {
-    const srcId = `agent_${a.agent_id}`
-    const args = a.action_args || {}
-    const authorName = (
-      args.post_author_name || args.comment_author_name || args.original_author_name || ''
-    ).toLowerCase()
-    const tgtUserId = agentNameMap.value[authorName]
-    const tgtId = tgtUserId != null ? `agent_${tgtUserId}` : null
-    return { srcId, tgtId, type: (a.action_type || '').toUpperCase() }
-  }).filter(a => a.srcId)
+  latestActions.value = [
+    ...latestActions.value,
+    ...fresh.map(a => {
+      const srcId = `agent_${a.agent_id}`
+      const args = a.action_args || {}
+      const authorName = (
+        args.post_author_name || args.comment_author_name || args.original_author_name || ''
+      ).toLowerCase()
+      const tgtUserId = agentNameMap.value[authorName]
+      const tgtId = tgtUserId != null ? `agent_${tgtUserId}` : null
+      return { srcId, tgtId, type: (a.action_type || '').toUpperCase() }
+    }).filter(a => a.srcId)
+  ]
 }
 
 const startActionPoll = () => {
@@ -449,14 +470,58 @@ const stopActionPoll = () => {
   if (actionPollTimer) { clearInterval(actionPollTimer); actionPollTimer = null }
 }
 
+const startSmsPoll = () => {
+  if (smsPollTimer) return
+  // Guard: only start if name map is populated (avoids empty-map polling
+  // when isSimulating fires before buildAgentGraph completes)
+  if (Object.keys(smsDisplayNameMap.value).length === 0) return
+
+  smsPollTimer = setInterval(async () => {
+    try {
+      const res = await getSmsEvents(currentSimulationId.value, lastSmsTimestamp)
+      const events = res.data?.data || []
+      if (!events.length) return
+
+      const newActions = []
+      events.forEach(ev => {
+        // Advance cursor before name-resolution guard — prevents re-fetching
+        // events whose names can't be resolved
+        if (ev.timestamp > lastSmsTimestamp) lastSmsTimestamp = ev.timestamp
+
+        if (ev.type !== 'sms_message') return
+        const d = ev.data || {}
+        const srcUserId = smsDisplayNameMap.value[(d.sender_name || '').toLowerCase()]
+        const tgtUserId = smsDisplayNameMap.value[(d.receiver_name || '').toLowerCase()]
+        if (srcUserId == null || tgtUserId == null) return
+
+        newActions.push({
+          srcId: `agent_${srcUserId}`,
+          tgtId: `agent_${tgtUserId}`,
+          type: 'SMS',
+        })
+      })
+
+      if (newActions.length) {
+        latestActions.value = [...latestActions.value, ...newActions]
+      }
+    } catch (_) {}
+  }, 4000)
+}
+
+const stopSmsPoll = () => {
+  if (smsPollTimer) { clearInterval(smsPollTimer); smsPollTimer = null }
+}
+
 watch(isSimulating, (newValue) => {
   if (newValue) {
     if (isDescriptionFlow.value) {
       startActionPoll()   // description-flow: animate actions, don't rebuild graph
+      startSmsPoll()
     }
     // document-flow: graph only refreshes on manual Refresh button click
   } else {
     stopActionPoll()
+    stopSmsPoll()
   }
 }, { immediate: true })
 
@@ -473,6 +538,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopActionPoll()
+  stopSmsPoll()
 })
 </script>
 
