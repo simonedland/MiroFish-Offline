@@ -957,7 +957,7 @@ function pulseNodeSoft(uuid) {
     .transition().duration(400).ease(d3.easeElasticOut).attr('r', 10)
 }
 
-function animateDot(srcId, tgtId) {
+function animateDot(srcId, tgtId, color = '#ff9f4a') {
   if (!svgG) return
   const pathEl = edgeByPair[`${srcId}_${tgtId}`] || edgeByPair[`${tgtId}_${srcId}`]
   let pathNode = pathEl
@@ -979,7 +979,7 @@ function animateDot(srcId, tgtId) {
     const cy = (sy + ty) / 2 + (dx / len) * offset
     tempPath = d3.select(svgG).append('path')
       .attr('d', `M${sx},${sy} Q${cx},${cy} ${tx},${ty}`)
-      .attr('stroke', '#ff9f4a')
+      .attr('stroke', color)
       .attr('stroke-width', 1.5)
       .attr('fill', 'none')
       .attr('opacity', 0.6)
@@ -995,7 +995,7 @@ function animateDot(srcId, tgtId) {
 
   const dot = d3.select(svgG).append('circle')
     .attr('r', 5)
-    .attr('fill', '#ff9f4a')
+    .attr('fill', color)
     .attr('pointer-events', 'none')
     .attr('opacity', 0.85)
 
@@ -1015,9 +1015,10 @@ function animateDot(srcId, tgtId) {
 watch(() => props.recentActions, (actions) => {
   if (!actions?.length) return
   actions.forEach(a => {
+    const color = a.type === 'SMS' ? '#4ecdc4' : '#ff9f4a'
     if (a.srcId) pulseNode(a.srcId)
     if (a.srcId && a.tgtId) {
-      animateDot(a.srcId, a.tgtId)
+      animateDot(a.srcId, a.tgtId, color)
       pulseNodeSoft(a.tgtId)
     }
   })
