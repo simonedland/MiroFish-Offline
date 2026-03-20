@@ -1,6 +1,6 @@
 """
 Simulation-related API routes
-Step2: Entity reading and filtering, OASIS simulation preparation and execution (fully automated)
+Step2: Entity reading and filtering, simulation preparation and execution (fully automated)
 """
 
 import os
@@ -12,7 +12,6 @@ from ..config import Config
 from ..services.entity_reader import EntityReader
 from ..services.oasis_profile_generator import OasisProfileGenerator
 from ..services.simulation_manager import SimulationManager, SimulationStatus
-from ..services.simulation_runner import SimulationRunner, RunnerStatus
 from ..services.relationship_generator import RelationshipGenerator
 from ..utils.logger import get_logger
 from ..models.project import ProjectManager
@@ -249,9 +248,7 @@ def create_simulation():
     Request (JSON):
         {
             "project_id": "proj_xxxx",      // Required
-            "graph_id": "mirofish_xxxx",    // Optional, if not provided, get from project
-            "enable_twitter": true,          // Optional, default true
-            "enable_reddit": true            // Optional, default true
+            "graph_id": "mirofish_xxxx"     // Optional, if not provided, get from project
         }
     
     Returns:
@@ -262,8 +259,6 @@ def create_simulation():
                 "project_id": "proj_xxxx",
                 "graph_id": "mirofish_xxxx",
                 "status": "created",
-                "enable_twitter": true,
-                "enable_reddit": true,
                 "created_at": "2025-12-01T10:00:00"
             }
         }
@@ -296,8 +291,6 @@ def create_simulation():
         state = manager.create_simulation(
             project_id=project_id,
             graph_id=graph_id,
-            enable_twitter=data.get('enable_twitter', True),
-            enable_reddit=data.get('enable_reddit', True),
         )
         
         return jsonify({
@@ -339,12 +332,11 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
     if not os.path.exists(simulation_dir):
         return False, {"reason": "Simulation directory does not exist"}
     
-    # Required file list (scripts not included, scripts are in backend/scripts/)
+    # Required file list
     required_files = [
         "state.json",
         "simulation_config.json",
         "reddit_profiles.json",
-        "twitter_profiles.csv"
     ]
     
     # Check if files exist
@@ -1114,12 +1106,19 @@ def get_simulation_history():
                 recommended_rounds = 0
             
             # Get running status (from run_state.json)
-            run_state = SimulationRunner.get_run_state(sim.simulation_id)
-            if run_state:
-                sim_dict["current_round"] = run_state.current_round
-                sim_dict["runner_status"] = run_state.runner_status.value
-                # Use user-set total_rounds，If not, thenUseRecommended rounds
-                sim_dict["total_rounds"] = run_state.total_rounds if run_state.total_rounds > 0 else recommended_rounds
+            import json as _json
+            _run_state_path = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, sim.simulation_id, "run_state.json")
+            if os.path.exists(_run_state_path):
+                try:
+                    with open(_run_state_path, 'r', encoding='utf-8') as _f:
+                        _rs = _json.load(_f)
+                    sim_dict["current_round"] = _rs.get("current_round", 0)
+                    sim_dict["runner_status"] = _rs.get("runner_status", "idle")
+                    sim_dict["total_rounds"] = _rs.get("total_rounds", 0) or recommended_rounds
+                except Exception:
+                    sim_dict["current_round"] = 0
+                    sim_dict["runner_status"] = "idle"
+                    sim_dict["total_rounds"] = recommended_rounds
             else:
                 sim_dict["current_round"] = 0
                 sim_dict["runner_status"] = "idle"
@@ -1232,9 +1231,8 @@ def get_simulation_profiles_realtime(simulation_id: str):
         }
     """
     import json
-    import csv
     from datetime import datetime
-    
+
     try:
         platform = request.args.get('platform', 'reddit')
         
@@ -1247,30 +1245,22 @@ def get_simulation_profiles_realtime(simulation_id: str):
                 "error": f"Simulation does not exist: {simulation_id}"
             }), 404
         
-        # Determine file path
-        if platform == "reddit":
-            profiles_file = os.path.join(sim_dir, "reddit_profiles.json")
-        else:
-            profiles_file = os.path.join(sim_dir, "twitter_profiles.csv")
-        
+        # Profiles are stored as JSON (reddit format)
+        profiles_file = os.path.join(sim_dir, "reddit_profiles.json")
+
         # Check if files exist
         file_exists = os.path.exists(profiles_file)
         profiles = []
         file_modified_at = None
-        
+
         if file_exists:
             # Get file modification time
             file_stat = os.stat(profiles_file)
             file_modified_at = datetime.fromtimestamp(file_stat.st_mtime).isoformat()
-            
+
             try:
-                if platform == "reddit":
-                    with open(profiles_file, 'r', encoding='utf-8') as f:
-                        profiles = json.load(f)
-                else:
-                    with open(profiles_file, 'r', encoding='utf-8') as f:
-                        reader = csv.DictReader(f)
-                        profiles = list(reader)
+                with open(profiles_file, 'r', encoding='utf-8') as f:
+                    profiles = json.load(f)
             except (json.JSONDecodeError, Exception) as e:
                 logger.warning(f"Failed to read profiles file: {e}")
                 profiles = []
@@ -1413,8 +1403,6 @@ def get_simulation_config_realtime(simulation_id: str):
                 "simulation_hours": config.get("time_config", {}).get("total_simulation_hours"),
                 "initial_posts_count": len(config.get("event_config", {}).get("initial_posts", [])),
                 "hot_topics_count": len(config.get("event_config", {}).get("hot_topics", [])),
-                "has_twitter_config": "twitter_config" in config,
-                "has_reddit_config": "reddit_config" in config,
                 "generated_at": config.get("generated_at"),
                 "llm_model": config.get("llm_model")
             }
@@ -1515,9 +1503,6 @@ def download_simulation_script(script_name: str):
         
         # Verify script name
         allowed_scripts = [
-            "run_twitter_simulation.py",
-            "run_reddit_simulation.py", 
-            "run_parallel_simulation.py",
             "action_logger.py"
         ]
         
@@ -1696,134 +1681,17 @@ def start_simulation():
                 return jsonify({"success": False, "error": str(e)}), 400
             return jsonify({"success": True, "data": result})
 
-        # Verify max_rounds Parameters
-        if max_rounds is not None:
-            try:
-                max_rounds = int(max_rounds)
-                if max_rounds <= 0:
-                    return jsonify({
-                        "success": False,
-                        "error": "max_rounds Must be positive integer"
-                    }), 400
-            except (ValueError, TypeError):
-                return jsonify({
-                    "success": False,
-                    "error": "max_rounds Must be valid integer"
-                }), 400
-
-        if platform not in ['twitter', 'reddit', 'parallel']:
-            return jsonify({
-                "success": False,
-                "error": f"Invalid platform type: {platform}，Optional: twitter/reddit/parallel"
-            }), 400
-
-        # Check if simulation is ready
-        manager = SimulationManager()
-        state = manager.get_simulation(simulation_id)
-
-        if not state:
-            return jsonify({
-                "success": False,
-                "error": f"Simulation does not exist: {simulation_id}"
-            }), 404
-
-        force_restarted = False
-        
-        # Intelligently handle status: if preparation work is complete, reset status to ready
-        if state.status != SimulationStatus.READY:
-            # Check if preparation is complete
-            is_prepared, prepare_info = _check_simulation_prepared(simulation_id)
-
-            if is_prepared:
-                # Preparation work complete, verify if simulation is not already running
-                if state.status == SimulationStatus.RUNNING:
-                    # Check if simulation process is really running
-                    run_state = SimulationRunner.get_run_state(simulation_id)
-                    if run_state and run_state.runner_status.value == "running":
-                        # Process is indeed running
-                        if force:
-                            # Force mode：Stop runningSimulation
-                            logger.info(f"Force mode：Stop runningSimulation {simulation_id}")
-                            try:
-                                SimulationRunner.stop_simulation(simulation_id)
-                            except Exception as e:
-                                logger.warning(f"Warning when stopping simulation: {str(e)}")
-                        else:
-                            return jsonify({
-                                "success": False,
-                                "error": f"Simulation is running. Please call /stop first or use force=true to force restart."
-                            }), 400
-
-                # If force mode，Clean runtime logs
-                if force:
-                    logger.info(f"Force mode: cleaning simulation runtime files for {simulation_id}")
-                    cleanup_result = SimulationRunner.cleanup_simulation_logs(simulation_id)
-                    if not cleanup_result.get("success"):
-                        logger.warning(f"Warning when cleaning logs: {cleanup_result.get('errors')}")
-                    force_restarted = True
-
-                # Process does not exist or has ended，Reset status to ready
-                logger.info(f"Simulation {simulation_id} preparation complete, resetting status to ready (previous status: {state.status.value})")
-                state.status = SimulationStatus.READY
-                manager._save_simulation_state(state)
-            else:
-                # Preparation not complete
-                return jsonify({
-                    "success": False,
-                    "error": f"Simulation not ready. Current status: {state.status.value}. Please call /prepare first"
-                }), 400
-        
-        # Get knowledge graphID（For knowledge graph memory update）
-        graph_id = None
-        if enable_graph_memory_update:
-            # Get from simulation status or project graph_id
-            graph_id = state.graph_id
-            if not graph_id:
-                # Try to get from project
-                project = ProjectManager.get_project(state.project_id)
-                if project:
-                    graph_id = project.graph_id
-            
-            if not graph_id:
-                return jsonify({
-                    "success": False,
-                    "error": "Enable knowledge graph memory update requires valid graph_id，Please ensure project graph built"
-                }), 400
-            
-            logger.info(f"Enable knowledge graph memory update: simulation_id={simulation_id}, graph_id={graph_id}")
-        
-        # Start simulation
-        run_state = SimulationRunner.start_simulation(
-            simulation_id=simulation_id,
-            platform=platform,
-            max_rounds=max_rounds,
-            enable_graph_memory_update=enable_graph_memory_update,
-            graph_id=graph_id
-        )
-        
-        # Update simulation status
-        state.status = SimulationStatus.RUNNING
-        manager._save_simulation_state(state)
-        
-        response_data = run_state.to_dict()
-        if max_rounds:
-            response_data['max_rounds_applied'] = max_rounds
-        response_data['graph_memory_update_enabled'] = enable_graph_memory_update
-        response_data['force_restarted'] = force_restarted
-        if enable_graph_memory_update:
-            response_data['graph_id'] = graph_id
-        
         return jsonify({
-            "success": True,
-            "data": response_data
-        })
-        
+            "success": False,
+            "error": "Only SMS simulation mode is supported. Use simulation_mode='sms'."
+        }), 400
+
     except ValueError as e:
         return jsonify({
             "success": False,
             "error": str(e)
         }), 400
-        
+
     except Exception as e:
         logger.error(f"Failed to start simulation: {str(e)}")
         return jsonify({
@@ -1862,27 +1730,27 @@ def stop_simulation():
                 "success": False,
                 "error": "Please provide simulation_id"
             }), 400
-        
-        run_state = SimulationRunner.stop_simulation(simulation_id)
-        
+
+        # Write SMS stop flag
+        from ..services.sms_simulation_runner import _get_stop_flag_path
+        try:
+            with open(_get_stop_flag_path(simulation_id), "w") as _sf:
+                _sf.write("stopped")
+        except Exception as _e:
+            logger.warning("Could not write SMS stop flag for %s: %s", simulation_id, _e)
+
         # Update simulation status
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
         if state:
             state.status = SimulationStatus.PAUSED
             manager._save_simulation_state(state)
-        
+
         return jsonify({
             "success": True,
-            "data": run_state.to_dict()
+            "data": {"simulation_id": simulation_id, "runner_status": "stopped"}
         })
-        
-    except ValueError as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 400
-        
+
     except Exception as e:
         logger.error(f"Failed to stop simulation: {str(e)}")
         return jsonify({
@@ -1921,9 +1789,10 @@ def get_run_status(simulation_id: str):
         }
     """
     try:
-        run_state = SimulationRunner.get_run_state(simulation_id)
-        
-        if not run_state:
+        import json as _json
+        run_state_path = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id, "run_state.json")
+
+        if not os.path.exists(run_state_path):
             return jsonify({
                 "success": True,
                 "data": {
@@ -1932,17 +1801,16 @@ def get_run_status(simulation_id: str):
                     "current_round": 0,
                     "total_rounds": 0,
                     "progress_percent": 0,
-                    "twitter_actions_count": 0,
-                    "reddit_actions_count": 0,
                     "total_actions_count": 0,
                 }
             })
-        
-        return jsonify({
-            "success": True,
-            "data": run_state.to_dict()
-        })
-        
+
+        with open(run_state_path, 'r', encoding='utf-8') as f:
+            run_state = _json.load(f)
+
+        run_state["simulation_id"] = simulation_id
+        return jsonify({"success": True, "data": run_state})
+
     except Exception as e:
         logger.error(f"Failed to get running status: {str(e)}")
         return jsonify({
@@ -1990,60 +1858,27 @@ def get_run_status_detail(simulation_id: str):
         }
     """
     try:
-        run_state = SimulationRunner.get_run_state(simulation_id)
-        platform_filter = request.args.get('platform')
-        
-        if not run_state:
+        import json as _json
+        run_state_path = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id, "run_state.json")
+
+        if not os.path.exists(run_state_path):
             return jsonify({
                 "success": True,
                 "data": {
                     "simulation_id": simulation_id,
                     "runner_status": "idle",
                     "all_actions": [],
-                    "twitter_actions": [],
-                    "reddit_actions": []
                 }
             })
-        
-        # Get complete action list
-        all_actions = SimulationRunner.get_all_actions(
-            simulation_id=simulation_id,
-            platform=platform_filter
-        )
-        
-        # Get actions by platform
-        twitter_actions = SimulationRunner.get_all_actions(
-            simulation_id=simulation_id,
-            platform="twitter"
-        ) if not platform_filter or platform_filter == "twitter" else []
-        
-        reddit_actions = SimulationRunner.get_all_actions(
-            simulation_id=simulation_id,
-            platform="reddit"
-        ) if not platform_filter or platform_filter == "reddit" else []
-        
-        # Get current round actions（recent_actions Only show latest round）
-        current_round = run_state.current_round
-        recent_actions = SimulationRunner.get_all_actions(
-            simulation_id=simulation_id,
-            platform=platform_filter,
-            round_num=current_round
-        ) if current_round > 0 else []
-        
-        # Get basic status information
-        result = run_state.to_dict()
-        result["all_actions"] = [a.to_dict() for a in all_actions]
-        result["twitter_actions"] = [a.to_dict() for a in twitter_actions]
-        result["reddit_actions"] = [a.to_dict() for a in reddit_actions]
-        result["rounds_count"] = len(run_state.rounds)
-        # recent_actions Only show latest round content of two platforms
-        result["recent_actions"] = [a.to_dict() for a in recent_actions]
-        
-        return jsonify({
-            "success": True,
-            "data": result
-        })
-        
+
+        with open(run_state_path, 'r', encoding='utf-8') as f:
+            result = _json.load(f)
+
+        result["simulation_id"] = simulation_id
+        result.setdefault("all_actions", [])
+
+        return jsonify({"success": True, "data": result})
+
     except Exception as e:
         logger.error(f"Failed to get detailed status: {str(e)}")
         return jsonify({
@@ -2081,20 +1916,11 @@ def get_simulation_actions(simulation_id: str):
         agent_id = request.args.get('agent_id', type=int)
         round_num = request.args.get('round_num', type=int)
         
-        actions = SimulationRunner.get_actions(
-            simulation_id=simulation_id,
-            limit=limit,
-            offset=offset,
-            platform=platform,
-            agent_id=agent_id,
-            round_num=round_num
-        )
-        
         return jsonify({
             "success": True,
             "data": {
-                "count": len(actions),
-                "actions": [a.to_dict() for a in actions]
+                "count": 0,
+                "actions": []
             }
         })
         
@@ -2121,20 +1947,11 @@ def get_simulation_timeline(simulation_id: str):
     Return summary information per round
     """
     try:
-        start_round = request.args.get('start_round', 0, type=int)
-        end_round = request.args.get('end_round', type=int)
-        
-        timeline = SimulationRunner.get_timeline(
-            simulation_id=simulation_id,
-            start_round=start_round,
-            end_round=end_round
-        )
-        
         return jsonify({
             "success": True,
             "data": {
-                "rounds_count": len(timeline),
-                "timeline": timeline
+                "rounds_count": 0,
+                "timeline": []
             }
         })
         
@@ -2155,13 +1972,11 @@ def get_agent_stats(simulation_id: str):
     For frontend display of agent activity ranking and statistics.
     """
     try:
-        stats = SimulationRunner.get_agent_stats(simulation_id)
-        
         return jsonify({
             "success": True,
             "data": {
-                "agents_count": len(stats),
-                "stats": stats
+                "agents_count": 0,
+                "stats": []
             }
         })
         
@@ -2388,56 +2203,37 @@ def interview_agent():
         simulation_id = data.get('simulation_id')
         agent_id = data.get('agent_id')
         prompt = data.get('prompt')
-        platform = data.get('platform')  # Optional：twitter/reddit/None
         timeout = data.get('timeout', 60)
-        
+
         if not simulation_id:
             return jsonify({
                 "success": False,
                 "error": "Please provide simulation_id"
             }), 400
-        
+
         if agent_id is None:
             return jsonify({
                 "success": False,
                 "error": "Please provide agent_id"
             }), 400
-        
+
         if not prompt:
             return jsonify({
                 "success": False,
-                "error": "Please provide prompt（Interview question）"
+                "error": "Please provide prompt"
             }), 400
-        
-        # VerifyplatformParameters
-        if platform and platform not in ("twitter", "reddit"):
-            return jsonify({
-                "success": False,
-                "error": "platform Parameter can only be 'twitter' Or 'reddit'"
-            }), 400
-        
-        # Check environment status
-        if not SimulationRunner.check_env_alive(simulation_id):
-            return jsonify({
-                "success": False,
-                "error": "Simulation environment not running or closed. Please ensure simulation is started and wait for it to progress."
-            }), 400
-        
-        # Optimizeprompt，Add prefix to avoidAgent call tools
-        optimized_prompt = optimize_interview_prompt(prompt)
-        
-        result = SimulationRunner.interview_agent(
-            simulation_id=simulation_id,
-            agent_id=agent_id,
-            prompt=optimized_prompt,
-            platform=platform,
-            timeout=timeout
-        )
 
-        return jsonify({
-            "success": result.get("success", False),
-            "data": result
-        })
+        # Route to SMS interview handler
+        manager_for_mode = SimulationManager()
+        optimized_prompt = optimize_interview_prompt(prompt)
+        result = _interview_sms_agents(
+            simulation_id,
+            [{"agent_id": agent_id, "prompt": optimized_prompt}],
+            manager_for_mode,
+        )
+        # Return the single agent's result directly
+        single = next(iter(result.get("results", {}).values()), result)
+        return jsonify({"success": True, "data": single})
         
     except ValueError as e:
         return jsonify({
@@ -2524,65 +2320,22 @@ def interview_agents_batch():
                 "error": "Please provide interviews（Interview list）"
             }), 400
 
-        # VerifyplatformParameters
-        if platform and platform not in ("twitter", "reddit"):
-            return jsonify({
-                "success": False,
-                "error": "platform Parameter can only be 'twitter' Or 'reddit'"
-            }), 400
-
         # Verify each interview item
         for i, interview in enumerate(interviews):
             if 'agent_id' not in interview:
                 return jsonify({
                     "success": False,
-                    "error": f"Interview list item{i+1}Missing agent_id"
+                    "error": f"Interview list item {i+1} missing agent_id"
                 }), 400
             if 'prompt' not in interview:
                 return jsonify({
                     "success": False,
-                    "error": f"Interview list item{i+1}Missing prompt"
-                }), 400
-            # Verify each item'splatform（IfHas）
-            item_platform = interview.get('platform')
-            if item_platform and item_platform not in ("twitter", "reddit"):
-                return jsonify({
-                    "success": False,
-                    "error": f"Interview list item {i+1}: platform must be 'twitter' or 'reddit'"
+                    "error": f"Interview list item {i+1} missing prompt"
                 }), 400
 
-        # SMS simulations have no OASIS process — handle with a direct LLM call.
         manager_for_mode = SimulationManager()
-        sim_state_for_mode = manager_for_mode.get_simulation(simulation_id)
-        if sim_state_for_mode and sim_state_for_mode.simulation_mode == "sms":
-            result = _interview_sms_agents(simulation_id, interviews, manager_for_mode)
-            return jsonify({"success": True, "data": result})
-
-        # Check environment status
-        if not SimulationRunner.check_env_alive(simulation_id):
-            return jsonify({
-                "success": False,
-                "error": "Simulation environment not running or closed. Please ensure simulation is started and wait for it to progress."
-            }), 400
-
-        # OptimizeEachInterview itemprompt，Add prefix to avoidAgent call tools
-        optimized_interviews = []
-        for interview in interviews:
-            optimized_interview = interview.copy()
-            optimized_interview['prompt'] = optimize_interview_prompt(interview.get('prompt', ''))
-            optimized_interviews.append(optimized_interview)
-
-        result = SimulationRunner.interview_agents_batch(
-            simulation_id=simulation_id,
-            interviews=optimized_interviews,
-            platform=platform,
-            timeout=timeout
-        )
-
-        return jsonify({
-            "success": result.get("success", False),
-            "data": result
-        })
+        result = _interview_sms_agents(simulation_id, interviews, manager_for_mode)
+        return jsonify({"success": True, "data": result})
 
     except ValueError as e:
         return jsonify({
@@ -2643,8 +2396,6 @@ def interview_all_agents():
 
         simulation_id = data.get('simulation_id')
         prompt = data.get('prompt')
-        platform = data.get('platform')  # Optional：twitter/reddit/None
-        timeout = data.get('timeout', 180)
 
         if not simulation_id:
             return jsonify({
@@ -2655,37 +2406,27 @@ def interview_all_agents():
         if not prompt:
             return jsonify({
                 "success": False,
-                "error": "Please provide prompt（Interview question）"
+                "error": "Please provide prompt"
             }), 400
 
-        # VerifyplatformParameters
-        if platform and platform not in ("twitter", "reddit"):
-            return jsonify({
-                "success": False,
-                "error": "platform Parameter can only be 'twitter' Or 'reddit'"
-            }), 400
+        # Load all agent IDs from profiles, then batch-interview them all
+        import json as _json
+        import os as _os
+        manager_for_all = SimulationManager()
+        sim_dir = manager_for_all._get_simulation_dir(simulation_id)
+        profiles_path = _os.path.join(sim_dir, "reddit_profiles.json")
+        profiles = []
+        if _os.path.exists(profiles_path):
+            with open(profiles_path, "r", encoding="utf-8") as _f:
+                profiles = _json.load(_f)
 
-        # Check environment status
-        if not SimulationRunner.check_env_alive(simulation_id):
-            return jsonify({
-                "success": False,
-                "error": "Simulation environment not running or closed. Please ensure simulation is started and wait for it to progress."
-            }), 400
-
-        # Optimizeprompt，Add prefix to avoidAgent call tools
         optimized_prompt = optimize_interview_prompt(prompt)
-
-        result = SimulationRunner.interview_all_agents(
-            simulation_id=simulation_id,
-            prompt=optimized_prompt,
-            platform=platform,
-            timeout=timeout
-        )
-
-        return jsonify({
-            "success": result.get("success", False),
-            "data": result
-        })
+        interviews = [
+            {"agent_id": p.get("user_id", i), "prompt": optimized_prompt}
+            for i, p in enumerate(profiles)
+        ]
+        result = _interview_sms_agents(simulation_id, interviews, manager_for_all)
+        return jsonify({"success": True, "data": result})
 
     except ValueError as e:
         return jsonify({
@@ -2756,18 +2497,11 @@ def get_interview_history():
                 "error": "Please provide simulation_id"
             }), 400
 
-        history = SimulationRunner.get_interview_history(
-            simulation_id=simulation_id,
-            platform=platform,
-            agent_id=agent_id,
-            limit=limit
-        )
-
         return jsonify({
             "success": True,
             "data": {
-                "count": len(history),
-                "history": history
+                "count": 0,
+                "history": []
             }
         })
 
@@ -2815,24 +2549,16 @@ def get_env_status():
                 "error": "Please provide simulation_id"
             }), 400
 
-        env_alive = SimulationRunner.check_env_alive(simulation_id)
-        
-        # Get more detailed status information
-        env_status = SimulationRunner.get_env_status_detail(simulation_id)
-
-        if env_alive:
-            message = "Environment running, ready to receive interview requests"
-        else:
-            message = "Environment not running or closed"
+        manager_env = SimulationManager()
+        state_env = manager_env.get_simulation(simulation_id)
+        env_alive = state_env is not None and state_env.status.value in ("running", "completed")
 
         return jsonify({
             "success": True,
             "data": {
                 "simulation_id": simulation_id,
                 "env_alive": env_alive,
-                "twitter_available": env_status.get("twitter_available", False),
-                "reddit_available": env_status.get("reddit_available", False),
-                "message": message
+                "message": "SMS simulation ready for interviews" if env_alive else "Simulation not running"
             }
         })
 
@@ -2882,22 +2608,16 @@ def close_simulation_env():
                 "success": False,
                 "error": "Please provide simulation_id"
             }), 400
-        
-        result = SimulationRunner.close_simulation_env(
-            simulation_id=simulation_id,
-            timeout=timeout
-        )
-        
-        # Update simulation status
+
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
         if state:
             state.status = SimulationStatus.COMPLETED
             manager._save_simulation_state(state)
-        
+
         return jsonify({
-            "success": result.get("success", False),
-            "data": result
+            "success": True,
+            "data": {"message": "Simulation marked as completed", "simulation_id": simulation_id}
         })
         
     except ValueError as e:

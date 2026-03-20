@@ -299,60 +299,6 @@
                 <span class="config-block-title">Recommendation algorithm configuration</span>
               </div>
               <div class="platforms-grid">
-                <div v-if="simulationConfig.twitter_config" class="platform-card">
-                  <div class="platform-card-header">
-                    <span class="platform-name">Platform 1：Square / Information flow</span>
-                  </div>
-                  <div class="platform-params">
-                    <div class="param-row">
-                      <span class="param-label">Time weight</span>
-                      <span class="param-value">{{ simulationConfig.twitter_config.recency_weight }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">Popularity weight</span>
-                      <span class="param-value">{{ simulationConfig.twitter_config.popularity_weight }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">Relevance weight</span>
-                      <span class="param-value">{{ simulationConfig.twitter_config.relevance_weight }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">Virus threshold</span>
-                      <span class="param-value">{{ simulationConfig.twitter_config.viral_threshold }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">Echo chamber strength</span>
-                      <span class="param-value">{{ simulationConfig.twitter_config.echo_chamber_strength }}</span>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="simulationConfig.reddit_config" class="platform-card">
-                  <div class="platform-card-header">
-                    <span class="platform-name">Platform 2：Topic / Community</span>
-                  </div>
-                  <div class="platform-params">
-                    <div class="param-row">
-                      <span class="param-label">Time weight</span>
-                      <span class="param-value">{{ simulationConfig.reddit_config.recency_weight }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">Popularity weight</span>
-                      <span class="param-value">{{ simulationConfig.reddit_config.popularity_weight }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">Relevance weight</span>
-                      <span class="param-value">{{ simulationConfig.reddit_config.relevance_weight }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">Virus threshold</span>
-                      <span class="param-value">{{ simulationConfig.reddit_config.viral_threshold }}</span>
-                    </div>
-                    <div class="param-row">
-                      <span class="param-label">Echo chamber strength</span>
-                      <span class="param-value">{{ simulationConfig.reddit_config.echo_chamber_strength }}</span>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -1032,7 +978,7 @@ const fetchConfigRealtime = async () => {
           addLog(`  ├─ Simulation Duration: ${data.summary.simulation_hours}hours`)
           addLog(`  ├─ Initial posts: ${data.summary.initial_posts_count}items`)
           addLog(`  ├─ Trending Topics: ${data.summary.hot_topics_count}Number`)
-          addLog(`  └─ Platform configuration: Twitter ${data.summary.has_twitter_config ? '✓' : '✗'}, Reddit ${data.summary.has_reddit_config ? '✓' : '✗'}`)
+          addLog(`  └─ Simulation rounds: ${data.summary.simulation_hours || '—'}h`)
         }
         
         // Show time configuration details

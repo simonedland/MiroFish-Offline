@@ -1,7 +1,6 @@
 """
-OASIS Simulation Manager
-Manage Twitter and Reddit dual-platform parallel simulations
-Use preset scripts + LLM intelligent generation of config parameters
+Simulation Manager — manages SMS simulation lifecycle
+Use LLM intelligent generation of config parameters
 """
 
 import os
@@ -34,22 +33,12 @@ class SimulationStatus(str, Enum):
     FAILED = "failed"
 
 
-class PlatformType(str, Enum):
-    """Platform type"""
-    TWITTER = "twitter"
-    REDDIT = "reddit"
-
-
 @dataclass
 class SimulationState:
     """Simulation status"""
     simulation_id: str
     project_id: str
     graph_id: str
-    
-    # Platform enabled state
-    enable_twitter: bool = True
-    enable_reddit: bool = True
 
     # Simulation mode
     simulation_mode: str = "oasis"  # "oasis" | "sms"
@@ -68,8 +57,6 @@ class SimulationState:
     
     # Runtime data
     current_round: int = 0
-    twitter_status: str = "not_started"
-    reddit_status: str = "not_started"
     
     # Timestamps
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -93,8 +80,6 @@ class SimulationState:
             "simulation_id": self.simulation_id,
             "project_id": self.project_id,
             "graph_id": self.graph_id,
-            "enable_twitter": self.enable_twitter,
-            "enable_reddit": self.enable_reddit,
             "simulation_mode": self.simulation_mode,
             "status": self.status.value,
             "entities_count": self.entities_count,
@@ -103,8 +88,6 @@ class SimulationState:
             "config_generated": self.config_generated,
             "config_reasoning": self.config_reasoning,
             "current_round": self.current_round,
-            "twitter_status": self.twitter_status,
-            "reddit_status": self.reddit_status,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "error": self.error,
@@ -198,8 +181,6 @@ class SimulationManager:
             simulation_id=simulation_id,
             project_id=data.get("project_id", ""),
             graph_id=data.get("graph_id", ""),
-            enable_twitter=data.get("enable_twitter", True),
-            enable_reddit=data.get("enable_reddit", True),
             simulation_mode=data.get("simulation_mode", "oasis"),
             status=SimulationStatus(data.get("status", "created")),
             entities_count=data.get("entities_count", 0),
@@ -208,8 +189,6 @@ class SimulationManager:
             config_generated=data.get("config_generated", False),
             config_reasoning=data.get("config_reasoning", ""),
             current_round=data.get("current_round", 0),
-            twitter_status=data.get("twitter_status", "not_started"),
-            reddit_status=data.get("reddit_status", "not_started"),
             created_at=data.get("created_at", datetime.now().isoformat()),
             updated_at=data.get("updated_at", datetime.now().isoformat()),
             error=data.get("error"),
@@ -229,30 +208,24 @@ class SimulationManager:
         self,
         project_id: str,
         graph_id: str,
-        enable_twitter: bool = True,
-        enable_reddit: bool = True,
     ) -> SimulationState:
         """
         Create new simulation
-        
+
         Args:
             project_id: Project ID
             graph_id: Graph ID
-            enable_twitter: Whether to enable Twitter simulation
-            enable_reddit: Whether to enable Reddit simulation
-            
+
         Returns:
             SimulationState
         """
         import uuid
         simulation_id = f"sim_{uuid.uuid4().hex[:12]}"
-        
+
         state = SimulationState(
             simulation_id=simulation_id,
             project_id=project_id,
             graph_id=graph_id,
-            enable_twitter=enable_twitter,
-            enable_reddit=enable_reddit,
             status=SimulationStatus.CREATED,
         )
         
@@ -364,15 +337,8 @@ class SimulationManager:
                         item_name=msg
                     )
             
-            # Set real-time save file path (prefer Reddit JSON format)
-            realtime_output_path = None
-            realtime_platform = "reddit"
-            if state.enable_reddit:
-                realtime_output_path = os.path.join(sim_dir, "reddit_profiles.json")
-                realtime_platform = "reddit"
-            elif state.enable_twitter:
-                realtime_output_path = os.path.join(sim_dir, "twitter_profiles.csv")
-                realtime_platform = "twitter"
+            # Set real-time save file path (JSON format)
+            realtime_output_path = os.path.join(sim_dir, "reddit_profiles.json")
             
             profiles = generator.generate_profiles_from_entities(
                 entities=filtered.entities,
@@ -381,7 +347,6 @@ class SimulationManager:
                 graph_id=state.graph_id,  # Pass graph_id for graph retrieval
                 parallel_count=parallel_profile_count,  # Parallel generation count
                 realtime_output_path=realtime_output_path,  # Real-time save path
-                output_platform=realtime_platform  # Output format
             )
             
             state.profiles_count = len(profiles)
@@ -396,20 +361,11 @@ class SimulationManager:
                     total=total_entities
                 )
             
-            if state.enable_reddit:
-                generator.save_profiles(
-                    profiles=profiles,
-                    file_path=os.path.join(sim_dir, "reddit_profiles.json"),
-                    platform="reddit"
-                )
-            
-            if state.enable_twitter:
-                # Twitter uses CSV format! This is OASIS requirement
-                generator.save_profiles(
-                    profiles=profiles,
-                    file_path=os.path.join(sim_dir, "twitter_profiles.csv"),
-                    platform="twitter"
-                )
+            generator.save_profiles(
+                profiles=profiles,
+                file_path=os.path.join(sim_dir, "reddit_profiles.json"),
+                platform="reddit"
+            )
             
             if progress_callback:
                 progress_callback(
@@ -445,8 +401,6 @@ class SimulationManager:
                 simulation_requirement=simulation_requirement,
                 document_text=document_text,
                 entities=filtered.entities,
-                enable_twitter=state.enable_twitter,
-                enable_reddit=state.enable_reddit,
                 agents_per_batch=agents_per_batch,
             )
             
@@ -502,8 +456,6 @@ class SimulationManager:
     def create_from_description(
         self,
         description: str,
-        enable_twitter: bool = True,
-        enable_reddit: bool = True,
         agents_per_batch: int = 15,
     ) -> str:
         """
@@ -516,8 +468,6 @@ class SimulationManager:
 
         Args:
             description: Free-form scenario description text.
-            enable_twitter: Whether to enable the Twitter platform.
-            enable_reddit:  Whether to enable the Reddit platform.
 
         Returns:
             simulation_id string.
@@ -531,8 +481,6 @@ class SimulationManager:
             simulation_id=simulation_id,
             project_id="scenario_flow",
             graph_id="",
-            enable_twitter=enable_twitter,
-            enable_reddit=enable_reddit,
             status=SimulationStatus.PREPARING,
         )
         self._save_simulation_state(state)
@@ -540,7 +488,7 @@ class SimulationManager:
 
         thread = threading.Thread(
             target=self._prepare_from_description_async,
-            args=(simulation_id, description, enable_twitter, enable_reddit, agents_per_batch),
+            args=(simulation_id, description, agents_per_batch),
             daemon=True,
         )
         thread.start()
@@ -551,8 +499,6 @@ class SimulationManager:
         self,
         simulation_id: str,
         description: str,
-        enable_twitter: bool,
-        enable_reddit: bool,
         agents_per_batch: int = 15,
     ) -> None:
         """
@@ -592,14 +538,7 @@ class SimulationManager:
             # ---- Phase 2: Generate profiles ----
             logger.info(f"[{simulation_id}] Generating {scenario.total_agents} agent profiles...")
 
-            # Determine realtime output path
-            if enable_reddit:
-                realtime_path = os.path.join(sim_dir, "reddit_profiles.json")
-                realtime_platform = "reddit"
-            else:
-                realtime_path = os.path.join(sim_dir, "twitter_profiles.csv")
-                realtime_platform = "twitter"
-
+            realtime_path = os.path.join(sim_dir, "reddit_profiles.json")
             profile_generator = DescriptionProfileGenerator()
 
             def profile_progress(current, total, msg):
@@ -610,30 +549,16 @@ class SimulationManager:
                 scenario=scenario,
                 progress_callback=profile_progress,
                 realtime_output_path=realtime_path,
-                output_platform=realtime_platform,
             )
 
             state.profiles_count = len(profiles)
             self._save_simulation_state(state)
 
-            # Persist profiles in both formats if both platforms enabled
-            if enable_reddit:
-                reddit_path = os.path.join(sim_dir, "reddit_profiles.json")
-                import json as _json
-                reddit_data = [p.to_reddit_format() for p in profiles]
-                with open(reddit_path, 'w', encoding='utf-8') as f:
-                    _json.dump(reddit_data, f, ensure_ascii=False, indent=2)
-
-            if enable_twitter:
-                twitter_path = os.path.join(sim_dir, "twitter_profiles.csv")
-                import csv as _csv
-                twitter_data = [p.to_twitter_format() for p in profiles]
-                if twitter_data:
-                    all_fields = list(dict.fromkeys(k for row in twitter_data for k in row.keys()))
-                    with open(twitter_path, 'w', encoding='utf-8', newline='') as f:
-                        writer = _csv.DictWriter(f, fieldnames=all_fields, extrasaction='ignore')
-                        writer.writeheader()
-                        writer.writerows(twitter_data)
+            # Persist profiles as JSON
+            import json as _json
+            reddit_data = [p.to_reddit_format() for p in profiles]
+            with open(realtime_path, 'w', encoding='utf-8') as f:
+                _json.dump(reddit_data, f, ensure_ascii=False, indent=2)
 
             logger.info(f"[{simulation_id}] Generated {len(profiles)} profiles")
 
@@ -650,8 +575,6 @@ class SimulationManager:
                 simulation_id=simulation_id,
                 scenario=scenario,
                 profiles=profiles,
-                enable_twitter=enable_twitter,
-                enable_reddit=enable_reddit,
                 progress_callback=config_progress,
                 agents_per_batch=agents_per_batch,
             )
@@ -895,21 +818,13 @@ class SimulationManager:
 
         # ── Step 1: stop any running or preparing simulation ──────────────
         if state and state.status in (SimulationStatus.RUNNING, SimulationStatus.PREPARING):
-            if state.simulation_mode == "sms":
-                # Signal the SMS runner to exit at next round boundary
-                from .sms_simulation_runner import _get_stop_flag_path
-                try:
-                    with open(_get_stop_flag_path(simulation_id), "w") as f:
-                        f.write("deleted")
-                except Exception as e:
-                    logger.warning("Could not write SMS stop flag for %s: %s", simulation_id, e)
-            else:
-                # OASIS runner
-                try:
-                    from .simulation_runner import SimulationRunner
-                    SimulationRunner.stop_simulation(simulation_id)
-                except Exception as e:
-                    logger.warning("Could not stop OASIS simulation %s: %s", simulation_id, e)
+            # Signal the SMS runner to exit at next round boundary
+            from .sms_simulation_runner import _get_stop_flag_path
+            try:
+                with open(_get_stop_flag_path(simulation_id), "w") as f:
+                    f.write("deleted")
+            except Exception as e:
+                logger.warning("Could not write SMS stop flag for %s: %s", simulation_id, e)
 
         # ── Step 2: delete associated reports ────────────────────────────
         try:
@@ -956,22 +871,9 @@ class SimulationManager:
         """Get run instructions"""
         sim_dir = self._get_simulation_dir(simulation_id)
         config_path = os.path.join(sim_dir, "simulation_config.json")
-        scripts_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts'))
-        
+
         return {
             "simulation_dir": sim_dir,
-            "scripts_dir": scripts_dir,
             "config_file": config_path,
-            "commands": {
-                "twitter": f"python {scripts_dir}/run_twitter_simulation.py --config {config_path}",
-                "reddit": f"python {scripts_dir}/run_reddit_simulation.py --config {config_path}",
-                "parallel": f"python {scripts_dir}/run_parallel_simulation.py --config {config_path}",
-            },
-            "instructions": (
-                f"1. Activate conda environment: conda activate MiroFish\n"
-                f"2. Run simulation (scripts located in {scripts_dir}):\n"
-                f"   - Run Twitter alone: python {scripts_dir}/run_twitter_simulation.py --config {config_path}\n"
-                f"   - Run Reddit alone: python {scripts_dir}/run_reddit_simulation.py --config {config_path}\n"
-                f"   - Run both platforms in parallel: python {scripts_dir}/run_parallel_simulation.py --config {config_path}"
-            )
+            "instructions": "Use simulation_mode=sms in the /api/simulation/start endpoint.",
         }

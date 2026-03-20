@@ -7,7 +7,6 @@ Adopt step-by-step generation strategy to avoid failures from generating too lon
 1. Generate time configuration
 2. Generate event configuration
 3. Generate agent configurations in batches
-4. Generate platform configuration
 """
 
 import json
@@ -130,23 +129,6 @@ class EventConfig:
 
 
 @dataclass
-class PlatformConfig:
-    """Platform-specific configuration"""
-    platform: str  # twitter or reddit
-
-    # Recommendation algorithm weights
-    recency_weight: float = 0.4  # Time freshness
-    popularity_weight: float = 0.3  # Popularity
-    relevance_weight: float = 0.3  # Relevance
-
-    # Viral threshold (number of interactions before triggering spread)
-    viral_threshold: int = 10
-
-    # Echo chamber effect strength (degree of similar opinion clustering)
-    echo_chamber_strength: float = 0.5
-
-
-@dataclass
 class SimulationParameters:
     """Complete simulation parameter configuration"""
     # Basic information
@@ -163,10 +145,6 @@ class SimulationParameters:
 
     # Event configuration
     event_config: EventConfig = field(default_factory=EventConfig)
-
-    # Platform configuration
-    twitter_config: Optional[PlatformConfig] = None
-    reddit_config: Optional[PlatformConfig] = None
 
     # LLM configuration
     llm_model: str = ""
@@ -186,8 +164,6 @@ class SimulationParameters:
             "time_config": time_dict,
             "agent_configs": [asdict(a) for a in self.agent_configs],
             "event_config": asdict(self.event_config),
-            "twitter_config": asdict(self.twitter_config) if self.twitter_config else None,
-            "reddit_config": asdict(self.reddit_config) if self.reddit_config else None,
             "llm_model": self.llm_model,
             "generated_at": self.generated_at,
             "generation_reasoning": self.generation_reasoning,
@@ -208,7 +184,6 @@ class SimulationConfigGenerator:
     Adopt step-by-step generation strategy:
     1. Generate time configuration and event configuration (lightweight)
     2. Generate agent configurations in batches (10-20 per batch)
-    3. Generate platform configuration
     """
 
     # Maximum context length in characters
@@ -241,8 +216,6 @@ class SimulationConfigGenerator:
         simulation_requirement: str,
         document_text: str,
         entities: List[EntityNode],
-        enable_twitter: bool = True,
-        enable_reddit: bool = True,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
         agents_per_batch: int = 15,
     ) -> SimulationParameters:
@@ -256,18 +229,16 @@ class SimulationConfigGenerator:
             simulation_requirement: Simulation requirement description
             document_text: Original document content
             entities: Filtered entity list
-            enable_twitter: Whether to enable Twitter
-            enable_reddit: Whether to enable Reddit
             progress_callback: Progress callback function(current_step, total_steps, message)
 
         Returns:
             SimulationParameters: Complete simulation parameters
         """
         logger.info(f"Starting intelligent simulation configuration generation: simulation_id={simulation_id}, entities={len(entities)}")
-        
+
         # Calculate total steps
         num_batches = math.ceil(len(entities) / agents_per_batch)
-        total_steps = 3 + num_batches  # time config + event config + N batch agents + platform config
+        total_steps = 2 + num_batches  # time config + event config + N batch agents
         current_step = 0
 
         def report_progress(step: int, message: str):
@@ -327,31 +298,6 @@ class SimulationConfigGenerator:
         assigned_count = len([p for p in event_config.initial_posts if p.get("poster_agent_id") is not None])
         reasoning_parts.append(f"Initial posts assigned: {assigned_count} posts assigned publishers")
 
-        # ========== Final step: Generate platform configuration ==========
-        report_progress(total_steps, "Generating platform configuration...")
-        twitter_config = None
-        reddit_config = None
-        
-        if enable_twitter:
-            twitter_config = PlatformConfig(
-                platform="twitter",
-                recency_weight=0.4,
-                popularity_weight=0.3,
-                relevance_weight=0.3,
-                viral_threshold=10,
-                echo_chamber_strength=0.5
-            )
-        
-        if enable_reddit:
-            reddit_config = PlatformConfig(
-                platform="reddit",
-                recency_weight=0.3,
-                popularity_weight=0.4,
-                relevance_weight=0.3,
-                viral_threshold=15,
-                echo_chamber_strength=0.6
-            )
-        
         # Build final parameters
         params = SimulationParameters(
             simulation_id=simulation_id,
@@ -361,8 +307,6 @@ class SimulationConfigGenerator:
             time_config=time_config,
             agent_configs=all_agent_configs,
             event_config=event_config,
-            twitter_config=twitter_config,
-            reddit_config=reddit_config,
             llm_model=self.model_name,
             generation_reasoning=" | ".join(reasoning_parts)
         )

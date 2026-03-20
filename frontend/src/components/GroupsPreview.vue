@@ -2,7 +2,7 @@
   <div :style="s.container">
     <div :style="s.header">
       <span :style="s.title">{{ scenario.title }}</span>
-      <span :style="s.badge">{{ scenario.total_agents }} agents · {{ scenario.platform_hint }}</span>
+      <span :style="s.badge">{{ scenario.total_agents }} agents</span>
     </div>
 
     <div :style="s.groupList">

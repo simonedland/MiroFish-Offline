@@ -53,7 +53,7 @@ class DescriptionProfileGenerator:
     personalities.
     """
 
-    PARALLEL_COUNT = 10  # More parallelism since there is no graph I/O
+    PARALLEL_COUNT = 20  # More parallelism since there is no graph I/O
 
     def __init__(self):
         self.client = AzureOpenAI(
@@ -74,7 +74,6 @@ class DescriptionProfileGenerator:
         scenario: ScenarioDefinition,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
         realtime_output_path: Optional[str] = None,
-        output_platform: str = "reddit",
     ) -> List[OasisAgentProfile]:
         """
         Generate all agent profiles for a ScenarioDefinition.
@@ -82,8 +81,7 @@ class DescriptionProfileGenerator:
         Args:
             scenario: Parsed scenario definition.
             progress_callback: Called with (current, total, message) after each profile.
-            realtime_output_path: If provided, write profiles incrementally as they complete.
-            output_platform: "reddit" or "twitter".
+            realtime_output_path: If provided, write profiles incrementally as they complete (JSON format).
 
         Returns:
             List of OasisAgentProfile in user_id order (0 … N-1).
@@ -112,18 +110,9 @@ class DescriptionProfileGenerator:
                 if not existing:
                     return
                 try:
-                    if output_platform == "reddit":
-                        data = [p.to_reddit_format() for p in existing]
-                        with open(realtime_output_path, 'w', encoding='utf-8') as f:
-                            json.dump(data, f, ensure_ascii=False, indent=2)
-                    else:
-                        import csv
-                        data = [p.to_twitter_format() for p in existing]
-                        if data:
-                            with open(realtime_output_path, 'w', encoding='utf-8', newline='') as f:
-                                writer = csv.DictWriter(f, fieldnames=list(data[0].keys()))
-                                writer.writeheader()
-                                writer.writerows(data)
+                    data = [p.to_reddit_format() for p in existing]
+                    with open(realtime_output_path, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, ensure_ascii=False, indent=2)
                 except Exception as exc:
                     logger.warning(f"Realtime profile save failed: {exc}")
 

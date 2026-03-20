@@ -32,7 +32,6 @@ class ScenarioDefinition:
     title: str
     total_agents: int
     theme: str
-    platform_hint: str             # "twitter" | "reddit" | "both"
     groups: List[AgentGroup] = field(default_factory=list)
     original_description: str = ""
 
@@ -41,7 +40,6 @@ class ScenarioDefinition:
             "title": self.title,
             "total_agents": self.total_agents,
             "theme": self.theme,
-            "platform_hint": self.platform_hint,
             "original_description": self.original_description,
             "groups": [g.to_dict() for g in self.groups],
         }
@@ -71,7 +69,6 @@ class ScenarioDefinition:
             title=data.get("title", "Untitled Scenario"),
             total_agents=int(data.get("total_agents", sum(g.count for g in groups))),
             theme=data.get("theme", ""),
-            platform_hint=data.get("platform_hint", "both"),
             groups=groups,
             original_description=data.get("original_description", ""),
         )

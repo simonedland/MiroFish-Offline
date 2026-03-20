@@ -80,12 +80,6 @@ def create_app(config_class=Config):
     # --- Initialize Neo4jStorage singleton (DI via app.extensions) ---
     app.extensions['neo4j_storage'] = _init_neo4j_storage(logger, should_log_startup)
 
-    # Register simulation process cleanup function (ensure all simulation processes terminate on server shutdown)
-    from .services.simulation_runner import SimulationRunner
-    SimulationRunner.register_cleanup()
-    if should_log_startup:
-        logger.info("Simulation process cleanup function registered")
-
     # Request logging middleware
     @app.before_request
     def log_request():

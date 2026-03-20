@@ -14,7 +14,7 @@ export const parseScenario = (description) => {
 
 /**
  * Create a simulation from a description (non-blocking — fires background thread).
- * @param {Object} data - { description, enable_twitter?, enable_reddit? }
+ * @param {Object} data - { description }
  */
 export const createScenario = (data) => {
   return service.post('/api/scenario/create', data)

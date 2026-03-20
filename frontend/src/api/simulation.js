@@ -2,7 +2,7 @@ import service, { requestWithRetry } from './index'
 
 /**
  * Create simulation
- * @param {Object} data - { project_id, graph_id?, enable_twitter?, enable_reddit? }
+ * @param {Object} data - { project_id, graph_id? }
  */
 export const createSimulation = (data) => {
   return requestWithRetry(() => service.post('/api/simulation/create', data), 3, 1000)
@@ -35,19 +35,17 @@ export const getSimulation = (simulationId) => {
 /**
  * Get Agent Profiles for simulation
  * @param {string} simulationId
- * @param {string} platform - 'reddit' | 'twitter'
  */
-export const getSimulationProfiles = (simulationId, platform = 'reddit') => {
-  return service.get(`/api/simulation/${simulationId}/profiles`, { params: { platform } })
+export const getSimulationProfiles = (simulationId) => {
+  return service.get(`/api/simulation/${simulationId}/profiles`)
 }
 
 /**
  * Get Agent Profiles being generated in real-time
  * @param {string} simulationId
- * @param {string} platform - 'reddit' | 'twitter'
  */
-export const getSimulationProfilesRealtime = (simulationId, platform = 'reddit') => {
-  return service.get(`/api/simulation/${simulationId}/profiles/realtime`, { params: { platform } })
+export const getSimulationProfilesRealtime = (simulationId) => {
+  return service.get(`/api/simulation/${simulationId}/profiles/realtime`)
 }
 
 /**
@@ -111,13 +109,12 @@ export const getRunStatusDetail = (simulationId) => {
 /**
  * Get posts from simulation
  * @param {string} simulationId
- * @param {string} platform - 'reddit' | 'twitter'
  * @param {number} limit - Number of results
  * @param {number} offset - Offset
  */
-export const getSimulationPosts = (simulationId, platform = 'reddit', limit = 50, offset = 0) => {
+export const getSimulationPosts = (simulationId, limit = 50, offset = 0) => {
   return service.get(`/api/simulation/${simulationId}/posts`, {
-    params: { platform, limit, offset }
+    params: { limit, offset }
   })
 }
 

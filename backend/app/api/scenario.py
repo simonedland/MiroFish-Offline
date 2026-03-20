@@ -68,9 +68,7 @@ def create_scenario():
 
     Request body:
         {
-          "description": "<text>",
-          "enable_twitter": true,
-          "enable_reddit":  true
+          "description": "<text>"
         }
 
     Response:
@@ -83,21 +81,11 @@ def create_scenario():
         if not description:
             return jsonify({'success': False, 'error': 'description is required'}), 400
 
-        enable_twitter = bool(body.get('enable_twitter', True))
-        enable_reddit = bool(body.get('enable_reddit', True))
         agents_per_batch = int(body.get('agents_per_batch', 15))
-
-        if not enable_twitter and not enable_reddit:
-            return jsonify({
-                'success': False,
-                'error': 'At least one platform (twitter or reddit) must be enabled',
-            }), 400
 
         manager = SimulationManager()
         simulation_id = manager.create_from_description(
             description=description,
-            enable_twitter=enable_twitter,
-            enable_reddit=enable_reddit,
             agents_per_batch=agents_per_batch,
         )
 

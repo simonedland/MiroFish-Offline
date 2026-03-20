@@ -184,7 +184,7 @@ Platform: Twitter. Theme: AI regulation debate.`
 const hints = [
   { icon: '◇', label: 'Specify agent counts', desc: 'e.g. "100 agents: 80 users, 20 bots"' },
   { icon: '◇', label: 'Describe behaviors', desc: 'What each group posts and how they interact' },
-  { icon: '◇', label: 'Pick a platform', desc: 'Twitter, Reddit, or both' },
+  { icon: '◇', label: 'SMS network simulation', desc: 'Agents communicate via text messages' },
   { icon: '◇', label: 'Powered by Azure OpenAI', desc: 'LLM-generated personas & simulation config' },
 ]
 
@@ -210,8 +210,6 @@ async function doGenerate() {
   try {
     const res = await createScenario({
       description: description.value,
-      enable_twitter: true,
-      enable_reddit: true,
     })
     simulationId.value = res.data.simulation_id
     phase.value = 'generating'

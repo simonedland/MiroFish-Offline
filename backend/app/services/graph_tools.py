@@ -1091,13 +1091,10 @@ Return the sub-questions as a JSON list."""
         """
         [InterviewAgents - Deep Interview]
 
-        Call the real OASIS interview API to interview Agents running in the simulation.
-        This method does NOT use GraphStorage — it calls SimulationRunner
-        and reads agent profiles from disk.
+        Interview agents running in the simulation directly via LLM.
+        Reads agent profiles from disk and calls LLM in-character for each agent.
         """
-        from .simulation_runner import SimulationRunner
-
-        logger.info(f"InterviewAgents deep interview (real API): {interview_requirement[:50]}...")
+        logger.info(f"InterviewAgents deep interview: {interview_requirement[:50]}...")
 
         result = InterviewResult(
             interview_topic=interview_requirement,
@@ -1151,59 +1148,32 @@ Return the sub-questions as a JSON list."""
         )
         optimized_prompt = f"{INTERVIEW_PROMPT_PREFIX}{combined_prompt}"
 
-        # Step 4: Call the real interview API
+        # Step 4: Interview agents directly via LLM (SMS mode)
+        import re
         try:
-            interviews_request = []
-            for agent_idx in selected_indices:
-                interviews_request.append({
-                    "agent_id": agent_idx,
-                    "prompt": optimized_prompt
-                })
-
-            logger.info(f"Calling batch interview API (dual platform): {len(interviews_request)} Agents")
-
-            api_result = SimulationRunner.interview_agents_batch(
-                simulation_id=simulation_id,
-                interviews=interviews_request,
-                platform=None,
-                timeout=180.0
-            )
-
-            logger.info(f"Interview API returned: {api_result.get('interviews_count', 0)} results, success={api_result.get('success')}")
-
-            if not api_result.get("success", False):
-                error_msg = api_result.get("error", "Unknown error")
-                logger.warning(f"Interview API call failed: {error_msg}")
-                result.summary = f"Interview API call failed: {error_msg}. Please check the OASIS simulation environment status."
-                return result
-
-            # Step 5: Parse API response
-            api_data = api_result.get("result", {})
-            results_dict = api_data.get("results", {}) if isinstance(api_data, dict) else {}
-
+            llm = LLMClient()
             for i, agent_idx in enumerate(selected_indices):
                 agent = selected_agents[i]
                 agent_name = agent.get("realname", agent.get("username", f"Agent_{agent_idx}"))
                 agent_role = agent.get("profession", "Unknown")
                 agent_bio = agent.get("bio", "")
+                persona = agent.get("persona") or agent_bio
 
-                twitter_result = results_dict.get(f"twitter_{agent_idx}", {})
-                reddit_result = results_dict.get(f"reddit_{agent_idx}", {})
+                system_prompt = (
+                    f"You are {agent_name}. Stay fully in character at all times.\n"
+                    f"Background: {persona}\n\n"
+                    "Reply naturally and directly as this person would. "
+                    "Do not break character or mention that you are an AI."
+                )
+                response_text = llm.chat(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": optimized_prompt},
+                    ]
+                )
+                response_text = self._clean_tool_call_response(response_text)
 
-                twitter_response = twitter_result.get("response", "")
-                reddit_response = reddit_result.get("response", "")
-
-                twitter_response = self._clean_tool_call_response(twitter_response)
-                reddit_response = self._clean_tool_call_response(reddit_response)
-
-                twitter_text = twitter_response if twitter_response else "(No response from this platform)"
-                reddit_text = reddit_response if reddit_response else "(No response from this platform)"
-                response_text = f"[Twitter Platform Response]\n{twitter_text}\n\n[Reddit Platform Response]\n{reddit_text}"
-
-                import re
-                combined_responses = f"{twitter_response} {reddit_response}"
-
-                clean_text = re.sub(r'#{1,6}\s+', '', combined_responses)
+                clean_text = re.sub(r'#{1,6}\s+', '', response_text)
                 clean_text = re.sub(r'\{[^}]*tool_name[^}]*\}', '', clean_text)
                 clean_text = re.sub(r'[*_`|>~\-]{2,}', '', clean_text)
                 clean_text = re.sub(r'Question\d+[：:]\s*', '', clean_text)
@@ -1236,12 +1206,8 @@ Return the sub-questions as a JSON list."""
 
             result.interviewed_count = len(result.interviews)
 
-        except ValueError as e:
-            logger.warning(f"Interview API call failed (environment not running?): {e}")
-            result.summary = f"Interview failed: {str(e)}. The simulation environment may be closed. Please ensure the OASIS environment is running."
-            return result
         except Exception as e:
-            logger.error(f"Interview API call exception: {e}")
+            logger.error(f"Interview LLM call exception: {e}")
             import traceback
             logger.error(traceback.format_exc())
             result.summary = f"An error occurred during the interview process: {str(e)}"
@@ -1254,7 +1220,7 @@ Return the sub-questions as a JSON list."""
                 interview_requirement=interview_requirement
             )
 
-        logger.info(f"InterviewAgents complete: Interviewed {result.interviewed_count} Agents (dual platform)")
+        logger.info(f"InterviewAgents complete: Interviewed {result.interviewed_count} Agents")
         return result
 
     @staticmethod

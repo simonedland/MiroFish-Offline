@@ -20,7 +20,6 @@ from .simulation_config_generator import (
     AgentActivityConfig,
     TimeSimulationConfig,
     EventConfig,
-    PlatformConfig,
     SimulationParameters,
 )
 
@@ -53,8 +52,6 @@ class DescriptionConfigGenerator:
         simulation_id: str,
         scenario: ScenarioDefinition,
         profiles: List[OasisAgentProfile],
-        enable_twitter: bool = True,
-        enable_reddit: bool = True,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         agents_per_batch: int = 15,
     ) -> SimulationParameters:
@@ -65,8 +62,6 @@ class DescriptionConfigGenerator:
             simulation_id: ID of the simulation being created.
             scenario: Parsed scenario definition.
             profiles: Generated agent profiles (user_id must match 0…N-1).
-            enable_twitter: Whether Twitter platform is enabled.
-            enable_reddit: Whether Reddit platform is enabled.
 
         Returns:
             SimulationParameters ready to be saved as simulation_config.json.
@@ -85,25 +80,6 @@ class DescriptionConfigGenerator:
         # 3. Event config via LLM
         event_config = self._build_event_config(scenario, agent_configs)
 
-        # 4. Platform configs (standard defaults)
-        twitter_config = PlatformConfig(
-            platform="twitter",
-            recency_weight=0.4,
-            popularity_weight=0.3,
-            relevance_weight=0.3,
-            viral_threshold=10,
-            echo_chamber_strength=0.5,
-        ) if enable_twitter else None
-
-        reddit_config = PlatformConfig(
-            platform="reddit",
-            recency_weight=0.3,
-            popularity_weight=0.4,
-            relevance_weight=0.3,
-            viral_threshold=15,
-            echo_chamber_strength=0.6,
-        ) if enable_reddit else None
-
         reasoning_parts = [
             f"Description flow: {scenario.title}",
             f"Groups: {', '.join(g.name for g in scenario.groups)}",
@@ -118,8 +94,6 @@ class DescriptionConfigGenerator:
             time_config=time_config,
             agent_configs=agent_configs,
             event_config=event_config,
-            twitter_config=twitter_config,
-            reddit_config=reddit_config,
             llm_model=self.model_name,
             generation_reasoning=" | ".join(reasoning_parts),
         )

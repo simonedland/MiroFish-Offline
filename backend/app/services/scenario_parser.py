@@ -95,7 +95,6 @@ Return a JSON object with this exact structure:
   "title": "<short title for the scenario>",
   "total_agents": <total number of agents as integer>,
   "theme": "<theme or topic of the scenario>",
-  "platform_hint": "<twitter|reddit|both>",
   "groups": [
     {{
       "name": "<snake_case group identifier, no spaces>",
@@ -117,7 +116,6 @@ Rules:
 - counts across all groups MUST sum exactly to total_agents
 - percentages MUST sum to 1.0
 - name must be snake_case (letters, digits, underscores only — no spaces)
-- infer platform_hint from context; default to "both" if unclear
 - use English for all field values"""
 
     def _build_scenario(self, data: Dict[str, Any], description: str) -> ScenarioDefinition:
@@ -157,7 +155,6 @@ Rules:
             title=str(data.get("title", "Untitled Scenario")),
             total_agents=total_agents,
             theme=str(data.get("theme", "")),
-            platform_hint=str(data.get("platform_hint", "both")),
             groups=groups,
             original_description=description,
         )
