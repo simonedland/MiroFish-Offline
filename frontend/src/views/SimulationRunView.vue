@@ -441,20 +441,16 @@ const processNewActions = (actions) => {
   if (actions.length <= seenActionCount) return
   const fresh = actions.slice(seenActionCount)
   seenActionCount = actions.length
-  const combined = [
-    ...latestActions.value,
-    ...fresh.map(a => {
-      const srcId = `agent_${a.agent_id}`
-      const args = a.action_args || {}
-      const authorName = (
-        args.post_author_name || args.comment_author_name || args.original_author_name || ''
-      ).toLowerCase()
-      const tgtUserId = agentNameMap.value[authorName]
-      const tgtId = tgtUserId != null ? `agent_${tgtUserId}` : null
-      return { srcId, tgtId, type: (a.action_type || '').toUpperCase() }
-    }).filter(a => a.srcId)
-  ]
-  latestActions.value = combined.slice(-50)
+  latestActions.value = fresh.map(a => {
+    const srcId = `agent_${a.agent_id}`
+    const args = a.action_args || {}
+    const authorName = (
+      args.post_author_name || args.comment_author_name || args.original_author_name || ''
+    ).toLowerCase()
+    const tgtUserId = agentNameMap.value[authorName]
+    const tgtId = tgtUserId != null ? `agent_${tgtUserId}` : null
+    return { srcId, tgtId, type: (a.action_type || '').toUpperCase() }
+  }).filter(a => a.srcId)
 }
 
 const startActionPoll = () => {
@@ -503,7 +499,7 @@ const startSmsPoll = () => {
       })
 
       if (newActions.length) {
-        latestActions.value = [...latestActions.value, ...newActions].slice(-50)
+        latestActions.value = newActions
       }
     } catch (_) {}
   }, 4000)
