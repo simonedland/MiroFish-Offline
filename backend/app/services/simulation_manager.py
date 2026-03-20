@@ -270,6 +270,7 @@ class SimulationManager:
         use_llm_for_profiles: bool = True,
         progress_callback: Optional[callable] = None,
         parallel_profile_count: int = 3,
+        agents_per_batch: int = 15,
         storage: 'GraphStorage' = None,
     ) -> SimulationState:
         """
@@ -445,7 +446,8 @@ class SimulationManager:
                 document_text=document_text,
                 entities=filtered.entities,
                 enable_twitter=state.enable_twitter,
-                enable_reddit=state.enable_reddit
+                enable_reddit=state.enable_reddit,
+                agents_per_batch=agents_per_batch,
             )
             
             if progress_callback:
@@ -502,6 +504,7 @@ class SimulationManager:
         description: str,
         enable_twitter: bool = True,
         enable_reddit: bool = True,
+        agents_per_batch: int = 15,
     ) -> str:
         """
         Create a simulation from a free-form scenario description.
@@ -537,7 +540,7 @@ class SimulationManager:
 
         thread = threading.Thread(
             target=self._prepare_from_description_async,
-            args=(simulation_id, description, enable_twitter, enable_reddit),
+            args=(simulation_id, description, enable_twitter, enable_reddit, agents_per_batch),
             daemon=True,
         )
         thread.start()
@@ -550,6 +553,7 @@ class SimulationManager:
         description: str,
         enable_twitter: bool,
         enable_reddit: bool,
+        agents_per_batch: int = 15,
     ) -> None:
         """
         Background thread: parse description → generate profiles → generate config.
@@ -649,6 +653,7 @@ class SimulationManager:
                 enable_twitter=enable_twitter,
                 enable_reddit=enable_reddit,
                 progress_callback=config_progress,
+                agents_per_batch=agents_per_batch,
             )
 
             config_path = os.path.join(sim_dir, "simulation_config.json")
@@ -698,17 +703,28 @@ class SimulationManager:
             state.error = str(exc)
             self._save_simulation_state(state)
 
-    def start_sms_simulation(self, simulation_id: str, max_rounds: int = None) -> dict:
+    def start_sms_simulation(self, simulation_id: str, max_rounds: int = None, force: bool = False) -> dict:
         """Start an SMS-mode simulation as a background thread."""
         import threading
         import asyncio
         import json as _json
         from .sms_db import init_db, register_agents
-        from .sms_simulation_runner import SmsSimulationRunner
+        from .sms_simulation_runner import SmsSimulationRunner, _get_stop_flag_path
 
         state = self.get_simulation(simulation_id)
         if state is None:
             raise ValueError(f"Simulation {simulation_id} not found")
+        if state.status == SimulationStatus.RUNNING:
+            if not force:
+                raise ValueError(f"Simulation {simulation_id} is already running")
+            # Force-stop existing run by writing the stop flag, then reset state
+            try:
+                with open(_get_stop_flag_path(simulation_id), "w") as _sf:
+                    _sf.write("force_restart")
+            except Exception as _e:
+                logger.warning("Could not write SMS stop flag for force restart: %s", _e)
+            state.status = SimulationStatus.READY
+            self._save_simulation_state(state)
 
         sim_dir = self._get_simulation_dir(simulation_id)
 
@@ -762,6 +778,7 @@ class SimulationManager:
 
         # Update state to RUNNING
         state.status = SimulationStatus.RUNNING
+        state.simulation_mode = "sms"
         self._save_simulation_state(state)
 
         run_state_path = os.path.join(sim_dir, "run_state.json")
@@ -778,6 +795,14 @@ class SimulationManager:
                     }, f)
             except Exception:
                 pass
+
+        # Remove any leftover stop flag before starting (important after force-restart)
+        stop_flag_path = _get_stop_flag_path(simulation_id)
+        if os.path.exists(stop_flag_path):
+            try:
+                os.remove(stop_flag_path)
+            except Exception as _e:
+                logger.warning("Could not remove SMS stop flag: %s", _e)
 
         _write_run_state("running")
 
@@ -819,6 +844,7 @@ class SimulationManager:
                     profiles=profiles,
                     relationships=actual_relationships,
                     config={"total_rounds": total_rounds},
+                    round_callback=lambda rn: _write_run_state("running", rn),
                 )
                 loop.run_until_complete(runner.run())
                 state.status = SimulationStatus.COMPLETED
@@ -835,7 +861,7 @@ class SimulationManager:
         thread = threading.Thread(target=_run_in_thread, daemon=True, name=f"sms-sim-{simulation_id}")
         thread.start()
 
-        return {"simulation_id": simulation_id, "mode": "sms", "status": "started"}
+        return {"simulation_id": simulation_id, "mode": "sms", "status": "started", "total_rounds": total_rounds}
 
     def get_simulation(self, simulation_id: str) -> Optional[SimulationState]:
         """Get simulation state"""
@@ -860,10 +886,43 @@ class SimulationManager:
         return simulations
     
     def delete_simulation(self, simulation_id: str) -> None:
-        """Permanently delete a simulation directory and remove from in-memory cache."""
+        """Stop any running simulation, delete all associated reports, then remove the directory."""
         sim_dir = self._get_simulation_dir(simulation_id)
         if not os.path.exists(sim_dir):
             raise ValueError(f"Simulation does not exist: {simulation_id}")
+
+        state = self._load_simulation_state(simulation_id)
+
+        # ── Step 1: stop any running or preparing simulation ──────────────
+        if state and state.status in (SimulationStatus.RUNNING, SimulationStatus.PREPARING):
+            if state.simulation_mode == "sms":
+                # Signal the SMS runner to exit at next round boundary
+                from .sms_simulation_runner import _get_stop_flag_path
+                try:
+                    with open(_get_stop_flag_path(simulation_id), "w") as f:
+                        f.write("deleted")
+                except Exception as e:
+                    logger.warning("Could not write SMS stop flag for %s: %s", simulation_id, e)
+            else:
+                # OASIS runner
+                try:
+                    from .simulation_runner import SimulationRunner
+                    SimulationRunner.stop_simulation(simulation_id)
+                except Exception as e:
+                    logger.warning("Could not stop OASIS simulation %s: %s", simulation_id, e)
+
+        # ── Step 2: delete associated reports ────────────────────────────
+        try:
+            from .report_agent import ReportManager
+            reports = ReportManager.list_reports(simulation_id=simulation_id)
+            for report in reports:
+                ReportManager.delete_report(report.report_id)
+            if reports:
+                logger.info("Deleted %d report(s) for simulation %s", len(reports), simulation_id)
+        except Exception as e:
+            logger.warning("Could not delete reports for simulation %s: %s", simulation_id, e)
+
+        # ── Step 3: remove simulation directory and in-memory cache ──────
         shutil.rmtree(sim_dir)
         self._simulations.pop(simulation_id, None)
 

@@ -244,6 +244,7 @@ class SimulationConfigGenerator:
         enable_twitter: bool = True,
         enable_reddit: bool = True,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        agents_per_batch: int = 15,
     ) -> SimulationParameters:
         """
         Intelligently generate complete simulation configuration (step-by-step generation)
@@ -265,7 +266,7 @@ class SimulationConfigGenerator:
         logger.info(f"Starting intelligent simulation configuration generation: simulation_id={simulation_id}, entities={len(entities)}")
         
         # Calculate total steps
-        num_batches = math.ceil(len(entities) / self.AGENTS_PER_BATCH)
+        num_batches = math.ceil(len(entities) / agents_per_batch)
         total_steps = 3 + num_batches  # time config + event config + N batch agents + platform config
         current_step = 0
 
@@ -301,8 +302,8 @@ class SimulationConfigGenerator:
         # ========== Step 3-N: Generate agent configurations in batches ==========
         all_agent_configs = []
         for batch_idx in range(num_batches):
-            start_idx = batch_idx * self.AGENTS_PER_BATCH
-            end_idx = min(start_idx + self.AGENTS_PER_BATCH, len(entities))
+            start_idx = batch_idx * agents_per_batch
+            end_idx = min(start_idx + agents_per_batch, len(entities))
             batch_entities = entities[start_idx:end_idx]
 
             report_progress(

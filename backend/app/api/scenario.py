@@ -85,6 +85,7 @@ def create_scenario():
 
         enable_twitter = bool(body.get('enable_twitter', True))
         enable_reddit = bool(body.get('enable_reddit', True))
+        agents_per_batch = int(body.get('agents_per_batch', 15))
 
         if not enable_twitter and not enable_reddit:
             return jsonify({
@@ -97,6 +98,7 @@ def create_scenario():
             description=description,
             enable_twitter=enable_twitter,
             enable_reddit=enable_reddit,
+            agents_per_batch=agents_per_batch,
         )
 
         logger.info(f"Created description-based simulation: {simulation_id}")

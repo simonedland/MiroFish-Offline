@@ -228,11 +228,18 @@ class SimulationRunner:
     
     @classmethod
     def get_run_state(cls, simulation_id: str) -> Optional[SimulationRunState]:
-        """Get run state"""
-        if simulation_id in cls._run_states:
-            return cls._run_states[simulation_id]
-        
-        # Try to load from file
+        """Get run state.
+
+        Always re-reads from disk when the cached state is 'running' so that
+        progress written by the SMS simulation thread (or any external writer)
+        is immediately visible to the polling endpoint.
+        """
+        cached = cls._run_states.get(simulation_id)
+        if cached is not None and cached.runner_status.value != "running":
+            # Completed / idle states don't change — serve from cache.
+            return cached
+
+        # Either not cached yet, or currently running → always read fresh from disk.
         state = cls._load_run_state(simulation_id)
         if state:
             cls._run_states[simulation_id] = state

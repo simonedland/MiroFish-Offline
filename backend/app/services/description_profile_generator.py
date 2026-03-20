@@ -101,6 +101,9 @@ class DescriptionProfileGenerator:
                 tasks.append((user_id, group, i))
                 user_id += 1
 
+        used_names: set = set()
+        used_usernames: set = set()
+
         def save_realtime():
             if not realtime_output_path:
                 return
@@ -126,20 +129,11 @@ class DescriptionProfileGenerator:
 
         def generate_one(uid: int, group: AgentGroup, within_idx: int):
             try:
-                profile = self._generate_profile(uid, group, within_idx)
+                profile = self._generate_profile(uid, group, within_idx, used_names, used_usernames, lock)
                 return uid, profile, None
             except Exception as exc:
                 logger.error(f"Profile generation failed uid={uid} group={group.name}: {exc}")
-                fallback = OasisAgentProfile(
-                    user_id=uid,
-                    user_name=f"user_{group.name}_{within_idx}_{random.randint(100,999)}",
-                    name=_FALLBACK_NAMES[within_idx % len(_FALLBACK_NAMES)],
-                    bio=f"{group.label}: {group.behavior_description[:100]}",
-                    persona=f"A {group.label.lower()} who {group.behavior_description}",
-                    source_entity_uuid=f"scenario_{group.name}_{within_idx}",
-                    source_entity_type=group.name,
-                    group_id=group.name,
-                )
+                fallback = self._rule_based_profile(uid, group, within_idx, used_names, used_usernames, lock)
                 return uid, fallback, str(exc)
 
         logger.info(
@@ -157,10 +151,11 @@ class DescriptionProfileGenerator:
                 for uid, group, within_idx in tasks
             }
 
-            # 120 s per worker batch is generous; if any thread hangs beyond the
-            # SDK-level timeout (60 s × 3 attempts + retries ≈ 200 s worst-case per
-            # agent), the global wall-clock limit below will break us out.
-            GLOBAL_TIMEOUT = 240  # seconds — adjust if you have >100 agents
+            # Each agent can take up to max_attempts × 60 s SDK timeout ≈ 250 s worst-case.
+            # Scale the global wall-clock limit with agent count and parallelism so that
+            # a legitimate slow run with rate-limiting isn't mistaken for a hang.
+            import math
+            GLOBAL_TIMEOUT = max(300, math.ceil(total / self.PARALLEL_COUNT) * 90)
 
             try:
                 for future in concurrent.futures.as_completed(future_map, timeout=GLOBAL_TIMEOUT):
@@ -202,7 +197,7 @@ class DescriptionProfileGenerator:
                 )
                 for uid in stuck_uids:
                     group, within_idx = task_lookup[uid]
-                    profiles[uid] = self._rule_based_profile(uid, group, within_idx)
+                    profiles[uid] = self._rule_based_profile(uid, group, within_idx, used_names, used_usernames, lock)
                     with lock:
                         completed_count[0] += 1
                         current = completed_count[0]
@@ -225,7 +220,8 @@ class DescriptionProfileGenerator:
     # ------------------------------------------------------------------
 
     def _generate_profile(
-        self, user_id: int, group: AgentGroup, within_idx: int
+        self, user_id: int, group: AgentGroup, within_idx: int,
+        used_names: set, used_usernames: set, lock: Lock,
     ) -> OasisAgentProfile:
         """Generate a single agent profile for one member of a group."""
         entity_name = f"agent_{group.name}_{within_idx}"
@@ -239,8 +235,7 @@ class DescriptionProfileGenerator:
             f"Stance: {group.stance}\n"
         )
 
-        # Use the extracted standalone prompt builder from oasis_profile_generator
-        prompt = build_individual_persona_prompt(
+        base_prompt = build_individual_persona_prompt(
             entity_name=entity_name,
             entity_type=entity_type,
             entity_summary=group_context,  # group context goes into summary slot
@@ -250,11 +245,23 @@ class DescriptionProfileGenerator:
 
         system_prompt = _get_profile_system_prompt()
 
-        max_attempts = 2
+        # 2 normal attempts + 2 extra for name-collision retries
+        max_attempts = 4
         last_error = None
+        excluded_names: set = set()
 
         for attempt in range(max_attempts):
             try:
+                # Append name exclusion hint when previous attempts produced duplicates
+                if excluded_names:
+                    names_str = ", ".join(f'"{n}"' for n in excluded_names)
+                    prompt = base_prompt + (
+                        f"\n\nIMPORTANT: The following names are already in use by other agents. "
+                        f"You MUST choose a completely different name: {names_str}"
+                    )
+                else:
+                    prompt = base_prompt
+
                 response = self.client.chat.completions.create(
                     model=self.model_name,
                     messages=[
@@ -262,7 +269,7 @@ class DescriptionProfileGenerator:
                         {"role": "user", "content": prompt},
                     ],
                     response_format={"type": "json_object"},
-                    temperature=max(0.4, 0.8 - attempt * 0.15),
+                    temperature=max(0.5, 0.9 - attempt * 0.1),
                     timeout=60,
                 )
 
@@ -280,7 +287,19 @@ class DescriptionProfileGenerator:
                     data["persona"] = f"A {group.label.lower()} who {group.behavior_description}"
 
                 llm_name = data.get("name", entity_name)
-                user_name = self._generate_username(llm_name)
+
+                # Atomic check-and-register name
+                with lock:
+                    name_taken = llm_name in used_names
+                    if not name_taken:
+                        used_names.add(llm_name)
+
+                if name_taken:
+                    excluded_names.add(llm_name)
+                    logger.debug(f"Name collision uid={user_id}: '{llm_name}' already taken, retrying")
+                    continue
+
+                user_name = self._generate_username_unique(llm_name, used_usernames, lock)
                 return OasisAgentProfile(
                     user_id=user_id,
                     user_name=user_name,
@@ -312,16 +331,33 @@ class DescriptionProfileGenerator:
 
         # Fallback: rule-based
         logger.warning(f"Using rule-based fallback for uid={user_id} group={group.name}")
-        return self._rule_based_profile(user_id, group, within_idx)
+        return self._rule_based_profile(user_id, group, within_idx, used_names, used_usernames, lock)
 
     def _rule_based_profile(
-        self, user_id: int, group: AgentGroup, within_idx: int
+        self, user_id: int, group: AgentGroup, within_idx: int,
+        used_names: set, used_usernames: set, lock: Lock,
     ) -> OasisAgentProfile:
         """Generate a minimal rule-based profile when LLM fails."""
-        name = _FALLBACK_NAMES[within_idx % len(_FALLBACK_NAMES)]
+        with lock:
+            name = None
+            for offset in range(len(_FALLBACK_NAMES)):
+                candidate = _FALLBACK_NAMES[(within_idx + offset) % len(_FALLBACK_NAMES)]
+                if candidate not in used_names:
+                    name = candidate
+                    used_names.add(name)
+                    break
+            if name is None:
+                # All fallback names taken — append a numeric suffix
+                base = _FALLBACK_NAMES[within_idx % len(_FALLBACK_NAMES)]
+                counter = 2
+                while f"{base} {counter}" in used_names:
+                    counter += 1
+                name = f"{base} {counter}"
+                used_names.add(name)
+
         return OasisAgentProfile(
             user_id=user_id,
-            user_name=self._generate_username(name),
+            user_name=self._generate_username_unique(name, used_usernames, lock),
             name=name,
             bio=f"{group.label}. {group.behavior_description[:150]}",
             persona=(
@@ -353,6 +389,24 @@ class DescriptionProfileGenerator:
         clean = name.lower().replace(" ", "_")
         clean = "".join(c for c in clean if c.isalnum() or c == "_")
         return f"{clean}_{random.randint(100, 999)}"
+
+    def _generate_username_unique(self, name: str, used_usernames: set, lock: Lock) -> str:
+        """Generate a username guaranteed unique within the current generation run."""
+        clean = name.lower().replace(" ", "_")
+        clean = "".join(c for c in clean if c.isalnum() or c == "_")
+        with lock:
+            for _ in range(900):  # 100–999 = 900 possible suffixes
+                candidate = f"{clean}_{random.randint(100, 999)}"
+                if candidate not in used_usernames:
+                    used_usernames.add(candidate)
+                    return candidate
+            # Extremely unlikely: all 900 slots taken for this base name
+            counter = 1000
+            while f"{clean}_{counter}" in used_usernames:
+                counter += 1
+            candidate = f"{clean}_{counter}"
+            used_usernames.add(candidate)
+            return candidate
 
     @staticmethod
     def _fix_truncated_json(content: str) -> str:

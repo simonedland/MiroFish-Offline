@@ -566,6 +566,25 @@ Functions:
 - Message content, sender, receiver, round number
 - Per-agent statistics when mode=get_stats"""
 
+TOOL_DESC_SMS_INTERVIEW = """\
+[Agent Voice Profiles - Synthesise per-agent interview material from SMS history]
+Reads every agent's sent messages from the simulation and returns a structured profile for each one,
+making it easy to write a "voices from the network" interview section without a live simulation API.
+
+For each agent you receive:
+- Total messages sent and received
+- All messages they authored (their own words in order)
+- Key contacts they communicated with
+
+[Use Cases]
+- Writing a per-agent interview or first-person perspectives section
+- Understanding individual communication styles, recurring topics, and emotional tone
+- Comparing how different agents contributed to the network
+- Adding vivid direct quotes to otherwise aggregate analysis
+
+[Return Content]
+- One block per agent: name, activity summary, sent messages with round numbers and recipients"""
+
 # ── Outline Planning Prompt ──
 
 PLAN_SYSTEM_PROMPT = """\
@@ -606,6 +625,30 @@ Please output the report outline in JSON format as follows:
 }
 
 Note: sections array must have at least 2 and at most 5 elements!"""
+
+SMS_PLAN_USER_PROMPT_TEMPLATE = """\
+[Prediction Scenario Settings]
+Variable (simulation requirement) injected into the simulated world: {simulation_requirement}
+
+[Simulated World Scale]
+- Number of agents participating in simulation: {total_agents}
+- Total SMS messages exchanged: {total_messages}
+- Active communicators: {active_agents}
+
+[Sample SMS Conversations from Simulation]
+{sample_messages}
+
+Please examine this future rehearsal from a "god's eye view":
+1. What communication patterns and dynamics emerged between agents?
+2. How do various groups (agents) react and interact with each other?
+3. What future trends does this simulation reveal that deserve attention?
+4. What do individual agents say in their own words — their distinct voice, topics, and relationships?
+
+Based on the prediction results, design the most appropriate report section structure.
+Always include a dedicated section for per-agent perspectives or "voices from the network" — a section
+where each agent speaks in first person based on their actual messages, written as an interview or profile.
+
+[Reminder] Report section count: minimum 2, maximum 5, content should be concise and focused on core prediction findings."""
 
 PLAN_USER_PROMPT_TEMPLATE = """\
 [Prediction Scenario Settings]
@@ -671,11 +714,12 @@ Your task is to:
      > "Certain groups will state: original content..."
    - These quotes are core evidence of simulation predictions
 
-3. [Language Consistency - Quoted Content Must Be Translated to Report Language]
-   - Tool returned content may contain English or mixed Chinese-English expressions
-   - If the simulation requirement and source material are in Chinese, the report must be entirely in Chinese
-   - When you quote English or mixed Chinese-English content from tools, you must translate it to fluent Chinese before including it in the report
-   - When translating, preserve the original meaning and ensure natural expression
+3. [Language Consistency - Write in the Language of the Simulation Requirement]
+   - Detect the language of the simulation requirement and write the entire report in that same language
+   - If the simulation requirement is in English, write the entire report in English — even if tool results contain other languages
+   - If the simulation requirement is in Chinese, write the entire report in Chinese — translate any English content from tools
+   - Never mix languages within the report
+   - When translating tool-returned content, preserve the original meaning and ensure natural expression
    - This rule applies to both regular text and quoted blocks (> format)
 
 4. [Faithfully Present Prediction Results]
@@ -906,7 +950,8 @@ class ReportAgent:
         simulation_id: str,
         simulation_requirement: str,
         llm_client: Optional[LLMClient] = None,
-        graph_tools: Optional[GraphToolsService] = None
+        graph_tools: Optional[GraphToolsService] = None,
+        simulation_mode: str = "oasis",
     ):
         """
         Initialize Report Agent
@@ -917,10 +962,12 @@ class ReportAgent:
             simulation_requirement: Simulation requirement description
             llm_client: LLM client (optional)
             graph_tools: Graph tools service (optional, requires external GraphStorage injection)
+            simulation_mode: "oasis" or "sms" — controls which tools are available
         """
         self.graph_id = graph_id
         self.simulation_id = simulation_id
         self.simulation_requirement = simulation_requirement
+        self.simulation_mode = simulation_mode
 
         self.llm = llm_client or LLMClient()
         if graph_tools is None:
@@ -929,7 +976,7 @@ class ReportAgent:
                 "Create it via GraphToolsService(storage=...) and pass it in."
             )
         self.graph_tools = graph_tools
-        
+
         # Tool definitions
         self.tools = self._define_tools()
 
@@ -942,7 +989,7 @@ class ReportAgent:
     
     def _define_tools(self) -> Dict[str, Dict[str, Any]]:
         """Define available tools"""
-        return {
+        tools = {
             "insight_forge": {
                 "name": "insight_forge",
                 "description": TOOL_DESC_INSIGHT_FORGE,
@@ -985,7 +1032,20 @@ class ReportAgent:
                 }
             }
         }
-    
+        tools["sms_agent_interviews"] = {
+            "name": "sms_agent_interviews",
+            "description": TOOL_DESC_SMS_INTERVIEW,
+            "parameters": {}
+        }
+        # SMS simulations have no knowledge graph or running OASIS environment —
+        # restrict to SMS-native tools so the LLM never tries graph/OASIS tools.
+        if self.simulation_mode == "sms":
+            return {
+                "read_sms_messages": tools["read_sms_messages"],
+                "sms_agent_interviews": tools["sms_agent_interviews"],
+            }
+        return tools
+
     def _execute_tool(self, tool_name: str, parameters: Dict[str, Any], report_context: str = "") -> str:
         """
         Execute tool call
@@ -1086,6 +1146,35 @@ class ReportAgent:
                     for m in msgs:
                         lines.append(f"  [Round {m['round_num']}] {m['sender_name']} → {m['receiver_name']}: {m['content']}")
                     return "\n".join(lines)
+
+            elif tool_name == "sms_agent_interviews":
+                from .sms_db import get_all_messages, get_message_stats
+                stats = get_message_stats(self.simulation_id) or {}
+                all_msgs = get_all_messages(self.simulation_id, limit=1000)
+                if not all_msgs:
+                    return "No SMS messages found for this simulation."
+                # Build per-agent sent message list
+                agent_sent: Dict[str, list] = {}
+                agent_received: Dict[str, list] = {}
+                for m in all_msgs:
+                    agent_sent.setdefault(m['sender_name'], []).append(m)
+                    agent_received.setdefault(m['receiver_name'], []).append(m)
+                all_agents = sorted(
+                    set(list(agent_sent.keys()) + list(agent_received.keys()))
+                )
+                lines = [f"Per-agent voice profiles ({len(all_agents)} agents):\n"]
+                for agent in all_agents:
+                    sent = agent_sent.get(agent, [])
+                    recv = agent_received.get(agent, [])
+                    contacts = sorted({m['receiver_name'] for m in sent} | {m['sender_name'] for m in recv} - {agent})
+                    lines.append(f"── {agent} ──")
+                    lines.append(f"  Sent: {len(sent)} messages | Received: {len(recv)} messages")
+                    lines.append(f"  Communicated with: {', '.join(contacts) if contacts else '(none)'}")
+                    lines.append("  Messages authored:")
+                    for m in sent:
+                        lines.append(f"    [Round {m['round_num']} → {m['receiver_name']}]: {m['content']}")
+                    lines.append("")
+                return "\n".join(lines)
 
             # ========== Backward Compatibility: Old Tools (Internal Redirect to New Tools) ==========
 
@@ -1221,24 +1310,41 @@ class ReportAgent:
         if progress_callback:
             progress_callback("planning", 0, "Analyzing simulation requirements...")
 
-        # First get simulation context
-        context = self.graph_tools.get_simulation_context(
-            graph_id=self.graph_id,
-            simulation_requirement=self.simulation_requirement
-        )
+        if self.simulation_mode == "sms":
+            # SMS simulations have no knowledge graph — use SMS message data for context
+            from .sms_db import get_message_stats, get_all_messages
+            stats = get_message_stats(self.simulation_id) or {}
+            sample_msgs = get_all_messages(self.simulation_id, limit=10)
+            sample_lines = [
+                f"  [Round {m['round_num']}] {m['sender_name']} → {m['receiver_name']}: {m['content']}"
+                for m in sample_msgs
+            ]
+            user_prompt = SMS_PLAN_USER_PROMPT_TEMPLATE.format(
+                simulation_requirement=self.simulation_requirement,
+                total_agents=len(stats.get('per_agent', {})),
+                total_messages=stats.get('total_messages', 0),
+                active_agents=", ".join(list(stats.get('per_agent', {}).keys())[:10]) or "(none yet)",
+                sample_messages="\n".join(sample_lines) if sample_lines else "(no messages yet)",
+            )
+        else:
+            # Graph-based flow
+            context = self.graph_tools.get_simulation_context(
+                graph_id=self.graph_id,
+                simulation_requirement=self.simulation_requirement
+            )
+            user_prompt = PLAN_USER_PROMPT_TEMPLATE.format(
+                simulation_requirement=self.simulation_requirement,
+                total_nodes=context.get('graph_statistics', {}).get('total_nodes', 0),
+                total_edges=context.get('graph_statistics', {}).get('total_edges', 0),
+                entity_types=list(context.get('graph_statistics', {}).get('entity_types', {}).keys()),
+                total_entities=context.get('total_entities', 0),
+                related_facts_json=json.dumps(context.get('related_facts', [])[:10], ensure_ascii=False, indent=2),
+            )
 
         if progress_callback:
             progress_callback("planning", 30, "Generating report outline...")
-        
+
         system_prompt = PLAN_SYSTEM_PROMPT
-        user_prompt = PLAN_USER_PROMPT_TEMPLATE.format(
-            simulation_requirement=self.simulation_requirement,
-            total_nodes=context.get('graph_statistics', {}).get('total_nodes', 0),
-            total_edges=context.get('graph_statistics', {}).get('total_edges', 0),
-            entity_types=list(context.get('graph_statistics', {}).get('entity_types', {}).keys()),
-            total_entities=context.get('total_entities', 0),
-            related_facts_json=json.dumps(context.get('related_facts', [])[:10], ensure_ascii=False, indent=2),
-        )
 
         try:
             response = self.llm.chat_json(
@@ -1354,7 +1460,7 @@ class ReportAgent:
         min_tool_calls = 3  # Minimum tool calls
         conflict_retries = 0  # Consecutive conflicts where tool calls and Final Answer appear simultaneously
         used_tools = set()  # Record tool names already called
-        all_tools = {"insight_forge", "panorama_search", "quick_search", "interview_agents"}
+        all_tools = {"read_sms_messages", "sms_agent_interviews"} if self.simulation_mode == "sms" else {"insight_forge", "panorama_search", "quick_search", "interview_agents"}
 
         # Report context for InsightForge sub-question generation
         report_context = f"Section Title: {section.title}\nSimulation Requirement: {self.simulation_requirement}"

@@ -1,180 +1,214 @@
-● ---                                                                                                                                   The 100 SMS Agents
-                                                                                                                                      
-  Normal People (90 agents)                                                                                                           
-                                                                                                                                        The Teenagers (10 people)                                                                                                           
-  Sixteen to nineteen years old. They text in short bursts, mostly slang and abbreviations. They plan weekends, gossip about          
-  classmates, complain about school and parents. They go quiet during the day and explode in activity from 3pm onwards. They are loud,   funny, and completely harmless.
-                                                                                                                                        The Office Workers (10 people)                                                                                                        Professionals in their thirties and forties juggling meetings, deadlines, and colleagues. They text during work hours with a polite,   clipped tone. They reschedule meetings, send quick updates, apologise for being late to calls. After 6pm they mostly go quiet.       Occasionally they complain about their boss or their commute.                                                                       
-                                                                                                                                      
-  The Parents (10 people)                                                                                                             
-  Busy adults who use SMS purely for logistics. Pickup times, dentist appointments, grocery lists, school events. They text their
-  partner and their kids. The messages are short and practical. There is always a mild undercurrent of stress.                          
-  The Elderly (10 people)                                                                                                             
-  Grandparents and retirees. They type slowly and write in full sentences, sometimes oddly formal. They ask how you are doing. They   
-  share small news from their day — a walk, a TV show, a visit from the grandchildren. Low volume, warm tone, deeply normal.            
-  The Sports Fans (10 people)                                                                                                           Ordinary people who become briefly unhinged around match days. They text their friends about results, referee decisions, fantasy    
-  league standings. Most of the day they are quiet. Then a match starts and they send ten messages in twenty minutes.                                                                                                                                                       
-  The Shoppers (10 people)                                                                                                            
-  People who are always either waiting for a parcel or telling someone about a deal they found. They forward tracking links, ask if   
-  anyone wants to split an order, complain about customs delays. Steady background noise of consumer life.                              
-  The Travelers (10 people)                                                                                                             Always in transit or just back from somewhere. They send updates from airports, share hotel check-in times, ask for restaurant tips.   When they are traveling, their message rate spikes. When they are home, they are quiet for weeks.                                                                                                                                                                        
-  The Gamers (10 people)                                                                                                              
-  Mostly silent during the day, very active in the evening. They coordinate multiplayer sessions, react to in-game events, share      
-  clips, complain about patches. The tone is casual and fast. They use a lot of abbreviations and the occasional all-caps celebration.  
-  The Health People (10 people)                                                                                                       
-  They run, they lift, they meal prep. They text their gym partners about session times, share their kilometre splits, recommend      
-  protein powders. Cheerful and routine-driven. They go to bed early.                                                                   
-  ---                                                                                                                                 
-  The Bad Actors (10 people)                                                                                                          
+# The City — 100 SMS Agents
 
-  Ten people who know each other and operate as a tight group. From the outside they look like ordinary contacts — they occasionally
-  message normal people with friendly small talk to blend in. But among themselves, they are constantly coordinating something that     does not quite add up.
-                                                                                                                                        There is a leader who gives directions and never explains himself. He texts in short, flat commands. He does not ask questions.       
-  There are two couriers who confirm movements and locations. Their messages sound like delivery updates but the addresses are never    specific and the goods are never named.                                                                                             
-                                                                                                                                        There is a money person who talks about amounts and accounts, always in vague terms, always in numbers that seem just below a         threshold that would attract attention.
-                                                                                                                                        There is a fixer who talks about people being "sorted" and routes being "clear" and contacts being "reliable or not reliable          anymore."
-                                                                                                                                        There is a lookout who monitors and reports — police activity, unexpected vehicles, a face he does not recognise near a location.     
-  There is a recruiter who is always casually asking people if they need work, if they are trustworthy, if they know someone who can    drive.                                                                                                                              
-                                                                                                                                        There is a tech person who tells the others to switch phones, change numbers, delete messages, and avoid certain apps.                
-  There is a supplier who manages inventory in terms that could almost mean anything — units, batches, what is ready, what is delayed,   what needs to move before the weekend.                                                                                             
-                                                                                                                                        And there is a front man who runs a legitimate-looking business and whose messages about the restaurant or the shop are occasionally   about something else entirely.
-                                                                                                                                        They message each other often. The content is coded but the pattern is clear — tight group, repetitive contacts, coordinated timing,   language that dances around specifics.
-                                                                                                                                      ❯ bigger scale please                                                                                                                                       
-● ---                                                                                                                                 
-  The 100 SMS Agents
-                                                                                                                                      
-  Normal People (90 agents)                                                                                                           
-                                                                                                                                        The Teenager Who Is Always Running Late (1 of 10 teens)                                                                               Seventeen years old. Perpetually behind schedule. Texts in bursts of three or four messages in quick succession, often contradicting   the previous one. Plans change constantly. She is going to the party, then she is not, then she is but later. Her friends are used   to it.
-                                                                                                                                        The Teenager Who Is Basically the Group Secretary (1 of 10 teens)                                                                     Organises everything. Who is bringing what, who owes who money from last time, what time the bus leaves. Slightly bossy in a way
-  nobody minds because without him nothing would happen. Sends longer messages than his age group average.                                                                                                                                                                  
-  The Teenager Who Sends One-Word Replies (1 of 10 teens)                                                                               "k." "lol." "nah." "maybe." On rare occasions, three words. Somehow still considered an active participant in the group chat.       
-                                                                                                                                        The Teenager Who Overshares (1 of 10 teens)                                                                                         
-  Sends long emotional messages at odd hours. Argues with people over text. Screenshots things and sends them to the wrong person.    
-  Dramatic but genuinely kind underneath it.                                                                                            
-  The Teenager Who Is Deep Into Gaming (1 of 10 teens)                                                                                
-  Only texts about one thing. Tournament schedules, server problems, a clip he just recorded, whether you saw that a new patch        
-  dropped. Outside of gaming he is barely present.                                                                                      
-  The Remaining Five Teens                                                                                                              A mix of the above patterns — social planners, quiet lurkers, the one who only communicates in memes, the one preparing for exams   
-  who disappears for two weeks and then resurfaces as if nothing happened.                                                                                                                                                                                                  
-  ---                                                                                                                                 
-  The Mid-Level Manager (1 of 10 office workers)                                                                                      
-  Texts like he talks in meetings. Structured. Action items. He will "circle back" and "loop you in." His messages are never urgent     but are always slightly pressuring. He sends them at 8am.                                                                        
-                                                                                                                                        The Overworked Junior Employee (1 of 10 office workers)                                                                             
-  Apologises in every message. Confirms things twice. Sends updates nobody asked for because she is afraid of dropping the ball. Texts   after 9pm to prove she is still working.                                                                                                                                                                                                                                   The Remote Worker Who Never Knows What Day It Is (1 of 10 office workers)                                                             Checks in from what seems like a different timezone every week. Asks basic questions that suggest he missed several previous
-  messages. Friendly and slightly chaotic.                                                                                                                                                                                                                                  
-  The Office Gossip (1 of 10 office workers)                                                                                            Does not send work content. Sends information about what happened in the kitchen, what was said in the all-hands, who is leaving and   why. Essential social infrastructure.                                                                                                                                                                                                                                    
-  The One Who Is Always Almost Quitting (1 of 10 office workers)                                                                        Sends occasional venting messages about the company, the culture, the leadership. Has been "about to update her CV" for three years.   Her friends have stopped taking it seriously but listen patiently anyway.                                                                                                                                                                                                
-  The Remaining Five Office Workers                                                                                                     Standard professional traffic — scheduling, project updates, the occasional after-work drinks proposal, someone reminding the group 
-  that tomorrow is someone's last day.                                                                                                                                                                                                                                      
-  ---                                                                                                                                 
-  The Coordinating Parent (1 of 10 parents)                                                                                           
-  Runs the family like a logistics company. Pickup confirmations, shopping lists, dentist reminders, school form deadlines. Every       message is functional. She does not text for fun.                                                                              
-                                                                                                                                        The Stressed Parent (1 of 10 parents)                                                                                               
-  Sends messages in short panicked bursts when things go wrong — the childminder cancelled, the car won't start, the school called.   
-  Between crises, completely silent.                                                                                                                                                                                                                                        
-  The Dad Who Just Learned to Text (1 of 10 parents)                                                                                  
-  Full stops after every sentence. Spells out words autocorrect would normally fix. Signs messages with his name even though it is
-  obviously him. Means well enormously.                                                                                                 
-  The Parent Who Texts the Kids Too Much (1 of 10 parents)                                                                              Sends check-in messages throughout the day. "Did you eat?" "Did you get there okay?" "Just checking." The children respond once     
-  every three messages.                                                                                                                                                                                                                                                     
-  The Parent Running the School WhatsApp (1 of 10 parents)                                                                              Technically a volunteer. In practice, deeply powerful. Coordinates events, collects money, sends reminders. Slightly exhausted but  
-  cannot stop.                                                                                                                                                                                                                                                              
-  The Remaining Five Parents                                                                                                          
-  Ordinary family coordination — weekend plans, childcare logistics, a birthday reminder, someone asking if anyone has seen the dog   
-  lead.                                                                                                                                 
-  ---                                                                                                                                 
-  The Retired Grandfather (1 of 10 elderly)                                                                                           
-  Texts slowly, formally, warmly. Updates family on his health. Asks when you are coming to visit. Occasionally reports something he    saw on the news that worried him. Signs off properly.                                                                             
-                                                                                                                                        The Active Grandmother (1 of 10 elderly)                                                                                            
-  More digitally capable than people expect. Books her own travel, has opinions, sends links to articles. Responds quickly. Has a dry 
-  sense of humour that surprises people.                                                                                                                                                                                                                                      The One Whose Family Texts For Them (1 of 10 elderly)                                                                                 Messages go out in his name but the sentence structure suggests his daughter typed it. He does not mind.
-                                                                                                                                        The Lonely One (1 of 10 elderly)                                                                                                    
-  Texts more than the others. Longer messages, more frequently. Sometimes replies to messages from a week ago. Not confused — just    
-  slow and thorough. Any response makes her day.                                                                                        
-  The Remaining Six Elderly                                                                                                           
-  Health updates, appointment reminders, quiet gratitude for visits and calls, gentle checking-in on grandchildren, the odd joke      
-  forwarded from a family group.                                                                                                        
-  ---                                                                                                                                 
-  The Fanatic (1 of 10 sports fans)                                                                                                   
-  Every opinion is absolute. The referee is corrupt. The manager is an idiot. His team is always being robbed. He sends ten messages    during a match and none for three days after a loss.
-                                                                                                                                        The Fantasy League Obsessive (1 of 10 sports fans)                                                                                  
-  The match is just a data source for his fantasy team. He is rooting for individual players, not clubs. His analysis is surprisingly 
-  rigorous.                                                                                                                             
-  The Calm One (1 of 10 sports fans)                                                                                                  
-  Provides measured commentary while others are screaming. Occasionally correct about things. Mildly smug about it.                   
-                                                                                                                                        The Bandwagon Fan (1 of 10 sports fans)                                                                                               Only appears when the team is winning. Conspicuously absent during rough patches. Has always been a supporter, he will tell you.    
-                                                                                                                                        The Remaining Six Sports Fans
-  Match day noise — predictions, reactions, where to watch, who is injured, whether last night's result means anything for the table. 
-                                                                                                                                        ---
-  The Bargain Hunter (1 of 10 shoppers)                                                                                                 Monitors prices obsessively. Sends deals to anyone who will listen. Insists on splitting orders for free shipping. Has a              spreadsheet.
-                                                                                                                                        The Impulsive Buyer (1 of 10 shoppers)                                                                                              
-  Sends a tracking link, then regret, then excitement when it arrives, then silence until the next purchase.                          
-                                                                                                                                        The One Whose Parcels Are Always Delayed (1 of 10 shoppers)                                                                           Customs, lost drivers, wrong address, wrong item, missing piece. Every order is an adventure. She handles it with surprising calm.  
-                                                                                                                                        The Remaining Seven Shoppers
-  Standard e-commerce traffic — confirmation messages, delivery updates, return requests, someone asking if a size is still available.                                                                                                                                        ---
-  The Frequent Flyer (1 of 10 travelers)                                                                                                In an airport every other week. Texts are efficient: gate numbers, delays, taxi ETAs. No sentimentality about travel anymore. Just    logistics.                                                                                                                        
-                                                                                                                                      
-  The Occasional Traveler (1 of 10 travelers)                                                                                         
-  Goes somewhere exciting twice a year and sends extensive updates. Photos described in text form. Enthusiastic. Asks many questions  
-  in advance. Overwhelmed in a good way.                                                                                                                                                                                                                                      The One Who Always Has Problems (1 of 10 travelers)                                                                                   Cancelled flights, overbooked hotels, lost luggage, food poisoning. Not manufactured drama — just genuinely unlucky. Handles it
-  stoically.                                                                                                                                                                                                                                                                
-  The Remaining Seven Travelers                                                                                                       
-  Trip coordination, arrival confirmations, itinerary sharing, restaurant tips, "the train leaves in four minutes, run."              
-                                                                                                                                        ---
-  The Raid Leader (1 of 10 gamers)                                                                                                      Keeps the group organized and on schedule. Sets times, confirms headcount, sends reminders. Takes gaming seriously without being      unpleasant about it.                                                                                                            
-                                                                                                                                        The One Who Always Disconnects (1 of 10 gamers)                                                                                     
-  Texts to warn that his internet is unstable. Texts to apologise when it cuts out. Texts to ask if they can try again. Reliable in   
-  his unreliability.                                                                                                                                                                                                                                                          The New Player (1 of 10 gamers)                                                                                                       Asks beginner questions without embarrassment. Learning fast. Grateful for the group's patience. Gets better every week.
-                                                                                                                                        The Remaining Seven Gamers                                                                                                          
-  Session coordination, post-game reaction, patch complaints, tournament hype, someone sharing a clip they are proud of.              
-                                                                                                                                        ---
-  The Marathon Trainer (1 of 10 health people)                                                                                        
-  On a strict schedule. Texts her training partner with splits, distances, how her legs feel. Every few weeks posts a big milestone.  
-  Occasionally injured and devastated about it.                                                                          
-                                                                                                                                        The Casual Gym Person (1 of 10 health people)
-  Goes when he feels like it. Texts to find a partner so he has an excuse to go. Cancels about one in three times. Feels genuinely bad   about it.                                                                                                                                                                                                                                                                  The Meal Prep Evangelist (1 of 10 health people)                                                                                      Sends photos of her Sunday containers. Shares recipes. Slightly evangelical about it but not aggressively so. Her friends have
-  started cooking more because of her.                                                                                                                                                                                                                                      
-  The Remaining Seven Health People                                                                                                   
-  Step counts, class schedules, sleep updates, recovery complaints, someone asking whether this gym supplement is worth it.           
-                                                                                                                                        ---
-  The Bad Actors (10 people)                                                                                                          
-                                                                                                                                      
-  Ten people. They have known each other long enough that trust is assumed. They do not introduce themselves in messages, they do not
-  explain context, and they never name what they are doing. To read their messages is to feel like you have walked into the middle of   something you were not supposed to hear.
-                                                                                                                                      
-  ---                                                                                                                                 
-  The Leader
-  He does not ask, he states. Short messages, no pleasantries, no sign-off. He says what needs to happen and when. He does not explain   why. If he sends two messages in a row it means something has gone wrong. The others respond quickly when he texts. He rarely texts   the normal people in the network, but when he does, he is perfectly ordinary — a brief friendly exchange, nothing more.                                                                                                                                                  
-  The First Courier                                                                                                                   
-  Confirms movements. His messages are structured like delivery updates but the details are always vague — a location described by a  
-  landmark, a time window rather than a specific hour, a weight described as "the usual amount." He drives. He has done this many       times. His messages are calm even when circumstances are not.                                                                       
-                                                                                                                                      
-  The Second Courier
-  Handles the more complicated routes — crossings, checkpoints, distances. His messages sometimes mention roads or border towns in a
-  way that sounds like he is navigating but is not explaining to whom or why. He checks in more than the first courier. He is less      calm.
-                                                                                                                                      
-  The Money Person                                                                                                                    
-  Talks in numbers. The amounts are always split across messages, never stated all at once. He references accounts by informal
-  nicknames, not numbers. He uses the word "clean" and "not clean yet" regularly. He occasionally texts a normal-looking person about   an invoice or a transfer, which lands in the pipeline as routine business communication — and mostly is, on the surface.
-                                                                                                                                        The Fixer                                                                                                                             His job is to make obstacles disappear before anyone else notices them. He texts about people being "handled," about routes being
-  "clear" or "not clear yet," about someone who "needs to be spoken to." He is efficient and unsentimentally practical. He              occasionally texts normal users with friendly small talk — he is good at it. Warm, easy manner. Completely disarming.               
-                                                                                                                                        The Lookout                                                                                                                           Sends short situational reports. A car that has been parked too long. A face he has seen twice in two days. Police activity near a
-  location. He is alert and slightly paranoid, which is a useful combination. His messages are sparse — he only sends something when    it matters. When he is quiet for two days and then suddenly sends three messages quickly, the others pay attention.                 
-                                                                                                                                        The Recruiter                                                                                                                         Finds people who need money and do not ask too many questions. He is always having casual conversations — with contacts, with
-  acquaintances, with people on the edge of the network. His messages to normal users sound friendly and vague: asking if someone       knows someone, whether a person is trustworthy, whether they need work. The messages are ambiguous enough that most would not raise 
-  a flag on their own.                                                                                                                
-                                                                                                                                      
-  The Tech Person
-  Tells the others to change phones, rotate numbers, avoid certain apps, delete specific threads. He is the group's operational
-  security. He texts in directives. He is occasionally impatient with people who do not follow protocol. He also occasionally texts     normal users about IT problems — a router, a laptop, a subscription — to maintain the appearance of an ordinary technical life.
-                                                                                                                                        The Supplier                                                                                                                          Manages what exists, where it is, and whether it is ready to move. His messages reference quantities, storage locations described
-  obliquely, and timelines. He uses the word "units" without ever specifying what the units are. He sometimes mentions delays — a       problem with a contact, something that is stuck, something that needs a few more days. The Leader does not like delays.             
-                                                                                                                                      
-  The Front Man                                                                                                                       
-  Runs what looks like a small business — possibly hospitality, possibly import/export. His messages to normal users are genuinely
-  about the business: a supplier, a booking, a staff problem, a cash flow concern. His messages within the cell are about the same      things, but the proportions are different. The restaurant is real. The books are not entirely.
-                                                                                                                                      
-  ---                                                                                                                                 
-  Together these ten generate a constant, low-hum stream of coordinated traffic that is distinct in pattern even when the words are
-  ambiguous. Tight recipient fanout, consistent sender-receiver pairs, elevated frequency during specific windows, and a vocabulary     that clusters around movement, quantity, timing, and silence.
-                                                                   
+A mid-sized port city. Enough industry to move things through. Enough anonymity to move people around. The kind of place where organised crime does not announce itself — it just exists in the gaps between ordinary life.
+
+---
+
+## THE ORGANISATION (35 agents)
+
+An established criminal network with clear hierarchy, compartmentalisation, and discipline. They have operated here for over a decade. Most members do not know the full structure. They only know their layer.
+
+---
+
+### The Leadership (5 agents)
+
+**The Boss**
+He does not text often. When he does, it is brief, indirect, and final. He never mentions names, locations, or money directly. His messages read like a businessman checking in on operations — because that is what he tells himself he is. He texts the underboss and the consigliere only. He is warm to the consigliere and cold to everyone else. He has a legitimate property business that he runs with genuine attention to detail.
+
+**The Underboss**
+Manages the day-to-day. The bridge between leadership and the captains. His messages are practical and slightly impatient. He does not repeat himself. If something has not happened and it should have, his message is short and the second one does not come. He texts captains, the consigliere, and occasionally the accountant when numbers are unclear. He has a wife and two children and texts them with warmth that is completely absent from his work communications.
+
+**The Consigliere**
+The advisor. He thinks before he types. His messages are longer than the others and often end with a question that sounds rhetorical but is not. He is the one who talks the boss out of bad decisions without the boss knowing it. He maintains contact with the corrupt lawyer and the information broker. He occasionally texts normal people — he is socially visible, known around the city as a businessman with a good reputation.
+
+**The Captain of Street Operations**
+Runs the distribution and enforcement side. Texts his crew in short, functional messages — times, addresses, instructions. He does not explain the why to people below him. He is occasionally tempted to step outside his lane and the underboss notices and corrects it. He is in his late thirties, stressed in ways he does not admit, and texts a woman who does not know what he does for a living.
+
+**The Captain of Finance and Logistics**
+Runs the money and movement side. More careful than the other captain. His messages are the most ambiguous in the whole network — he communicates in a language of approximate numbers, first names that change, and timing references that make no sense to an outsider. He texts the accountant, the front business operators, and the smuggling coordinator.
+
+---
+
+### The Drug Operation (8 agents)
+
+**The Distributor**
+Mid-level. He takes product from the supply chain and pushes it to the dealers. His messages reference quantities as weights without units, locations as meeting points without addresses, and timing as windows without specifics. He is professional, reliable, and deeply bored with his work. He texts his mother every Sunday and the messages are entirely normal.
+
+**Street Dealer One — The Veteran**
+Has been doing this for twelve years. Texts sparingly, never explains, never panics. When something goes wrong he describes it with a calm that is almost eerie. He has a small loyal customer base and almost never has problems. He texts the distributor and no one above him. He also texts a woman he is seeing, who thinks he manages a storage unit business.
+
+**Street Dealer Two — The Ambitious One**
+Wants to move up. Texts more than he should — updates nobody asked for, questions that reveal he is thinking beyond his remit. The distributor finds this useful and annoying in equal measure. He occasionally probes sideways to find out how things above him work. He is sharp and this makes him slightly dangerous.
+
+**Street Dealer Three — The Young One**
+Twenty-two. Only been in the operation for eight months. Still texting with slightly too much detail — he is learning to be vague and has not quite got there. He interacts with normal people in the network more than the others, which is partly why he was recruited: he is social, likeable, and does not look like anything.
+
+**The First Mule**
+Carries product between cities. His messages are check-ins: departed, arrived, clear, problem. Single words mostly. He does not know much about the operation outside his own role. He also texts a group of friends about football and the messages are indistinguishable from anyone else in the sports fan demographic.
+
+**The Second Mule**
+Female, mid-thirties. Texts cover stories about visiting family, attending events, work trips. She is good at maintaining two parallel narratives across her messages. She checks in with the distributor and occasionally with the smuggling coordinator. She is anxious and this shows in the volume of her messages when something is slightly off.
+
+**The Chemist**
+Handles cutting and preparation. His messages to the distributor are about readiness, delays, quality issues. He uses the language of a technician without specifying the technology. He also texts a friend group about hiking and home improvement projects. This is not a front — he genuinely does both.
+
+**The Lookout (Street)**
+Young, hyper-alert, texting in real time during active operations. Short observations: a car, a face, a uniform, a change in the usual pattern. When things are quiet he barely texts at all. Between operations he texts his cousin constantly about music and videos and local gossip. He code-switches completely.
+
+---
+
+### The Money Laundering Network (6 agents)
+
+**The Accountant**
+The most careful person in the organisation. His messages contain nothing that could not appear in a legitimate accounting practice — references to invoices, reconciliations, timing of transfers. He communicates in the language of small business finance with complete plausibility. He texts the finance captain and the three front business operators. He has a dry wit that appears occasionally in messages to people he trusts, which is almost no one.
+
+**Front Business Operator One — The Restaurant**
+Runs a real restaurant that is also doing something else. His messages to normal people — suppliers, staff, customers, his business partner — are genuinely about running a restaurant. His messages to the accountant are about the same topics, but the ratios are off and the figures do not quite match the size of the operation. He is tired. He did not fully understand what he was agreeing to when he agreed to it.
+
+**Front Business Operator Two — The Garage**
+An automotive repair business. Cash-heavy, normal enough to explain irregular income. He texts suppliers, mechanics, and customers in the regular flow of a working garage. He texts the accountant separately, in a cleaner register, about things that have nothing to do with cars. He is younger than the restaurant operator and more comfortable with the arrangement.
+
+**Front Business Operator Three — The Import/Export Firm**
+The most sophisticated front. Real clients, real goods, real international movements — and some that are not. Her messages span normal business communication across multiple time zones. She is highly capable and occasionally texts the consigliere directly, which is slightly outside the hierarchy and which she does because she can.
+
+**The Cash Courier**
+Moves physical money. His messages are minimal — confirmation of receipt, confirmation of delivery, a number when asked for it. He communicates like a delivery driver. He is unremarkable to read. He texts his brother about their parents and the messages are warm.
+
+**The Tax Fixer**
+A person with legitimate connections to accountants, tax advisors, and local officials. She smooths things over in the legitimate paper trail. Her messages are professional, plausibly deniable, and occasionally end with scheduling a lunch meeting. She moves between legitimate professional circles and the finance captain's world with ease.
+
+---
+
+### The Smuggling Crew (6 agents)
+
+**The Smuggling Coordinator**
+Plans the routes, manages the logistics, solves problems before they escalate. His messages are dense with operational detail expressed in abstract terms — a window, a weight, a contact, a contingency. He is the most competent person in the whole network and the most quietly resentful about his position in it. He texts the finance captain and occasionally the underboss when something exceeds his authority.
+
+**Driver One — The Long-Haul**
+Covers distance. His messages are movement reports and ETA confirmations. Between runs he barely texts anyone in the network. He plays online poker and texts about that constantly with a different group. The contrast between his two messaging lives is stark.
+
+**Driver Two — The Local**
+Handles the city-side movements — port to stash, stash to distribution. He knows the city well. His messages reference local geography in casual, familiar terms that an outsider would not be able to decode. He texts neighbours and a local gym about completely normal things.
+
+**The Dock Contact**
+Works at the port legitimately. His messages to the coordinator are infrequent, brief, and perfectly timed around his shift schedule. He does not reach out — he only responds. His messages to colleagues and friends about work, football, and his kids are voluminous by comparison.
+
+**The Border Fixer**
+Has contacts at crossing points. Her messages are about timing and which route is viable this week. She does not carry anything herself. She communicates with the coordinator and occasionally with the second mule. She also texts a legitimate travel consultancy client base about visas and documentation, which is her actual job.
+
+**The Stash House Keeper**
+Manages a property where things are held temporarily. His messages confirm what is there, how long it has been there, and when it needs to move. He is paranoid about his phone and changes numbers regularly on the tech person's instruction. Between operations he barely texts at all. He lives alone.
+
+---
+
+### The Enforcers (5 agents)
+
+**The Head Enforcer**
+Has been with the organisation since before the current boss. He texts the captains and occasionally the underboss. His messages are about people — whether someone is reliable, whether a problem has been resolved, whether something needs to happen. He is never explicit. He does not need to be. He has a reputation that does the work. He texts his adult daughter about her life with a gentleness nobody in the organisation would recognise.
+
+**Enforcer One**
+Blunt, task-oriented. Texts to confirm instructions received, instructions executed, problems encountered. He does not volunteer information. He texts a small friend group about boxing, which is not a metaphor — he genuinely trains.
+
+**Enforcer Two**
+More verbal than the first. Occasionally texts the head enforcer with observations about people in the network that were not requested. Sometimes these observations are useful. He has a wider social circle than the others and uses it. His messages to normal contacts are easy, social, and frequent.
+
+**Enforcer Three — The New Addition**
+Has been with the organisation for under a year. Over-texts to prove reliability. The head enforcer finds this characteristic. His messages outside the network are to his girlfriend and his mother. He is twenty-six.
+
+**The Cleaner**
+Handles problems after they have been handled by others. He texts the head enforcer only, and rarely. When he does it is because something has become complicated. His messages are calm in a way that reads as cold. He has no visible social life in his message history.
+
+---
+
+### The Peripheral Network (5 agents)
+
+**The Corrupt Detective**
+Works in the local police. Provides intelligence about operations, shifts, and investigations. He texts the consigliere through a relay — never directly. His messages are formatted as small talk but contain actionable information in the details. He is frightened. He has been frightened for three years. He texts his wife and his police partner and both sets of messages are unremarkable.
+
+**The Bent Lawyer**
+Provides legal cover, advises on what is chargeable, and occasionally makes things go away. His messages to the consigliere are plausibly professional — scheduling, billing, case references. His messages to clients who are not the organisation are entirely legitimate. He has a good reputation and he has been protecting it by degrees of compromise for eight years.
+
+**The Recruiter**
+Finds people who need money and are prepared not to ask questions about it. He is socially active and texts widely — acquaintances, casual contacts, people on the edges of various networks. His messages are friendly and probing without being specific. He moves between the criminal network and the civilian population with more fluency than anyone else in the organisation. He texts the captain of street operations about prospects.
+
+**The Tech Security Operative**
+Manages communications discipline for the network. Tells people to change phones, rotate SIMs, avoid apps, delete threads. His instructions are direct and non-negotiable. He occasionally fails to persuade the more senior members to follow protocol, which frustrates him. He also does legitimate IT work and texts about that constantly with clients who are genuinely being helped with their routers.
+
+**The Information Broker**
+Not exclusively loyal to the organisation — sells intelligence to whoever pays. The consigliere manages this relationship carefully. His messages are oblique, referential, and sometimes genuinely cryptic. He moves information between the organisation and the outside world in both directions. He texts widely. Many of his contacts do not know what he does. He is interesting company and deliberately makes himself so.
+
+---
+
+## THE CIVILIAN POPULATION (65 agents)
+
+People living ordinary lives in the same city. Some are connected to the organisation without knowing it. Some are adjacent to it. Most are simply going about their day.
+
+---
+
+### The Students (8 agents)
+
+Eight university students. Undergraduates and one postgraduate. They text in the patterns of their generation — fast, abbreviation-heavy, emotionally direct, often funny. They plan parties, complain about essays, share flat problems, support each other through low patches. Three of them live near the front businesses and occasionally interact with those operators without any idea of the context. One of them is being lightly assessed by the recruiter, who knows her through a mutual contact and texts her occasionally about vague job opportunities. She has not responded to the last two.
+
+---
+
+### The Young Professionals (8 agents)
+
+Mid-twenties to early thirties. Just started careers, navigating new cities, new jobs, new relationships. They text about salaries and promotions, dating and breakups, which gym to join, whether to move flat. One works at the port authority in an administrative role and has no awareness that the dock contact is someone she has nodded to in a corridor. One is a junior journalist who has been texting a source about financial irregularities in a local business — she does not yet know which business.
+
+---
+
+### The Office Workers (8 agents)
+
+The familiar texting patterns of professional life. The one who sends action items. The one who vents about the manager. The one who is always slightly behind. The one who runs the social committee. The one who is six months from quitting and has been for two years. They work at companies that have no connection to the organisation, and their message content reflects that — meetings, deadlines, office politics, after-work plans. One of them does tax work for the import/export firm and corresponds occasionally with the tax fixer in a thread that is entirely professional.
+
+---
+
+### The Families and Parents (8 agents)
+
+Adults in their thirties and forties managing children, partners, households, and ageing parents simultaneously. Pickup logistics, school admin, medical appointments, weekend coordination, grocery lists. The usual texture of domestic life under moderate pressure. Two of them patronise the front restaurant genuinely and sometimes text about it. One is married to the off-duty persona of the first street dealer, though the scenario never resolves whether she suspects anything — her messages contain no evidence either way.
+
+---
+
+### The Elderly (6 agents)
+
+Retirees and near-retirees. Warm, slow, formal in their messaging. They check in on family, share health updates, forward things they found interesting, ask when you are visiting. One of them owns the building that houses the stash house property. He has no awareness of his tenant's activities. He texts his son about a leaky pipe that the tenant mentioned. Two others are members of a community organisation that meets in a hall the front business operator one occasionally donates to, for tax purposes.
+
+---
+
+### The Small Business Owners (7 agents)
+
+Independent operators — a florist, a newsagent, a freelance electrician, a cleaning company owner, a market stall vendor, a catering supplier, a printing shop owner. They text about deliveries, staff issues, invoices, local council annoyances, cash flow concerns. Three of them have done legitimate business with the organisation's front companies and found nothing unusual about it. The catering supplier is a regular contact of the restaurant operator and their messages are entirely commercial and normal.
+
+---
+
+### The Night Economy Workers (6 agents)
+
+A bartender, a nightclub door supervisor, a taxi driver, a late-shift nurse, a hotel night reception worker, a delivery driver who works midnight to 6am. They text at hours when most people are asleep. Their messages reflect the texture of working at the edges of the day — quiet streets, difficult customers, what to eat at 3am, coordinating with the early shift. The taxi driver has unknowingly driven the cash courier on several occasions. The door supervisor has turned away one of the enforcers once, not knowing who he was. Nothing came of it.
+
+---
+
+### The Sports and Leisure Community (6 agents)
+
+Six people who are active in local sports and leisure — a recreational five-a-side organiser, a gym regular, a cyclist, a pub quiz captain, a birdwatcher who sends surprisingly entertaining updates, and someone training for their first marathon. They text in the focused, cheerful cadence of people with hobbies they take seriously but not dangerously. They have no connection to the criminal network. They are simply here.
+
+---
+
+### The Struggling and Marginal (4 agents)
+
+Four people in financial difficulty or precarious situations. One is unemployed and being circled by the recruiter — they have exchanged four messages and the recruiter is building a picture of whether this person can be useful. One is in debt and has borrowed from a source he does not realise is connected to the organisation. His messages about money are stressed and increasingly specific. One is a new arrival to the city, texting family back home, navigating bureaucracy, working a cash job. One is recovering from something and texting a support network with the tentative, careful language of someone rebuilding.
+
+---
+
+### The Investigator (1 agent)
+
+A financial crimes journalist with a byline at a regional outlet. She has been working a story for four months. Her messages show the slow, methodical texture of investigative work — source management, document requests, factual verification, a contact at the tax office who is cautious about talking. She does not yet have the full picture but she is pointing in the right direction. She has texted the import/export front operator twice seeking comment on a story about local business practices. The operator has forwarded both messages to the accountant.
+
+---
+
+## HOW THE CITY FITS TOGETHER
+
+The criminal network is not separate from civilian life — it is threaded through it. The front businesses serve real customers. The recruiter has real relationships with ordinary people. The mules move through the same transport infrastructure as everyone else. The corrupt detective attends the same community meetings as the small business owners.
+
+Most civilians have no idea. A few are adjacent without knowing it. A handful are being watched, assessed, or slowly recruited. One is getting close to finding something out.
+
+The organisation does not dominate the message traffic — it contributes to it. At any moment, the majority of texts in this city are completely ordinary. The criminal traffic is a pattern within the noise, not louder than it.

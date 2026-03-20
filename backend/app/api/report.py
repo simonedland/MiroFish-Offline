@@ -128,6 +128,7 @@ def generate_report():
         from flask import current_app
         storage = current_app.extensions.get('neo4j_storage')
         graph_tools = GraphToolsService(storage=storage) if storage else None
+        simulation_mode = state.simulation_mode  # capture before thread
 
         # Create async task
         task_manager = TaskManager()
@@ -155,7 +156,8 @@ def generate_report():
                     graph_id=graph_id,
                     simulation_id=simulation_id,
                     simulation_requirement=simulation_requirement,
-                    graph_tools=graph_tools
+                    graph_tools=graph_tools,
+                    simulation_mode=simulation_mode,
                 )
 
                 # Progress callback
@@ -570,7 +572,8 @@ def chat_with_report_agent():
             graph_id=graph_id,
             simulation_id=simulation_id,
             simulation_requirement=simulation_requirement,
-            graph_tools=graph_tools
+            graph_tools=graph_tools,
+            simulation_mode=state.simulation_mode,
         )
 
         result = agent.chat(message=message, chat_history=chat_history)

@@ -37,11 +37,12 @@
     <main class="content-area">
       <!-- Left Panel: Graph -->
       <div class="panel-wrapper left" :style="leftPanelStyle">
-        <GraphPanel 
+        <GraphPanel
           :graphData="graphData"
           :loading="graphLoading"
           :currentPhase="4"
           :isSimulating="false"
+          :clustered="isDescriptionFlow"
           @refresh="refreshGraph"
           @toggle-maximize="toggleMaximize('graph')"
         />
@@ -67,7 +68,8 @@ import { useRoute, useRouter } from 'vue-router'
 import GraphPanel from '../components/GraphPanel.vue'
 import Step4Report from '../components/Step4Report.vue'
 import { getProject, getGraphData } from '../api/graph'
-import { getSimulation } from '../api/simulation'
+import { getSimulation, getSimulationProfiles, getSimulationRelationships } from '../api/simulation'
+import { getSimulationGroups } from '../api/scenario'
 import { getReport } from '../api/report'
 
 const route = useRoute()
@@ -87,6 +89,7 @@ const simulationId = ref(null)
 const projectData = ref(null)
 const graphData = ref(null)
 const graphLoading = ref(false)
+const isDescriptionFlow = ref(false)
 const systemLogs = ref([])
 const currentStatus = ref('processing') // processing | completed | error
 
@@ -163,6 +166,10 @@ const loadReportData = async () => {
               // Get graph data
               if (projRes.data.graph_id) {
                 await loadGraph(projRes.data.graph_id)
+              } else {
+                // Description-flow: no Neo4j graph — build synthetic agent graph
+                isDescriptionFlow.value = true
+                await buildAgentGraph()
               }
             }
           }
@@ -193,8 +200,118 @@ const loadGraph = async (graphId) => {
 }
 
 const refreshGraph = () => {
-  if (projectData.value?.graph_id) {
+  if (isDescriptionFlow.value) {
+    buildAgentGraph()
+  } else if (projectData.value?.graph_id) {
     loadGraph(projectData.value.graph_id)
+  }
+}
+
+const buildAgentGraph = async () => {
+  if (!simulationId.value) return
+  graphLoading.value = true
+  try {
+    const [profilesRes, groupsRes] = await Promise.allSettled([
+      getSimulationProfiles(simulationId.value, 'reddit'),
+      getSimulationGroups(simulationId.value),
+    ])
+
+    const profiles = profilesRes.status === 'fulfilled' ? (profilesRes.value.data?.profiles || []) : []
+    const groups   = groupsRes.status   === 'fulfilled' ? (groupsRes.value.data?.groups || []) : []
+
+    if (profiles.length === 0) return
+
+    const groupByName = {}
+    groups.forEach(g => { groupByName[g.name] = g })
+
+    const nodes = profiles.map(p => {
+      const groupId = p.group_id || 'agent'
+      const group   = groupByName[groupId] || null
+      return {
+        uuid:   `agent_${p.user_id}`,
+        name:   p.username || p.user_name || p.name || `Agent ${p.user_id}`,
+        labels: [groupId],
+        username:    p.username || p.user_name || '',
+        bio:         p.bio || '',
+        persona:     p.persona || '',
+        age:         p.age || null,
+        gender:      p.gender || null,
+        mbti:        p.mbti || null,
+        country:     p.country || null,
+        profession:  p.profession || null,
+        interested_topics: p.interested_topics || [],
+        karma:       p.karma || null,
+        group_id:    groupId,
+        group: group ? {
+          label:                group.label,
+          behavior_description: group.behavior_description,
+          communication_style:  group.communication_style,
+          stance:               group.stance,
+          sentiment_bias:       group.sentiment_bias,
+          activity_level:       group.activity_level,
+          active_hours_hint:    group.active_hours_hint,
+          interacts_with:       group.interacts_with || [],
+        } : null,
+      }
+    })
+
+    const groupAgents = {}
+    profiles.forEach(p => {
+      const g = p.group_id || 'unknown'
+      if (!groupAgents[g]) groupAgents[g] = []
+      groupAgents[g].push(p.user_id)
+    })
+
+    const edgeSet = new Set()
+    const edges   = []
+    const addEdge = (srcId, tgtId, type, label) => {
+      if (srcId === tgtId) return
+      const key = `${srcId}_${tgtId}_${type}`
+      if (edgeSet.has(key)) return
+      edgeSet.add(key)
+      edges.push({
+        source_node_uuid: `agent_${srcId}`,
+        target_node_uuid: `agent_${tgtId}`,
+        relationship_type: type,
+        name: label || type,
+      })
+    }
+
+    groups.forEach(group => {
+      const srcs = groupAgents[group.name] || []
+      if (!srcs.length) return
+      const intraCount = Math.min(srcs.length, group.communication_style === 'coordinate_within_group' ? srcs.length : 3)
+      for (let i = 0; i < srcs.length; i++) {
+        for (let j = 1; j <= intraCount; j++) {
+          addEdge(srcs[i], srcs[(i + j) % srcs.length],
+            group.communication_style === 'coordinate_within_group' ? 'COORDINATES' : 'KNOWS')
+        }
+      }
+      ;(group.interacts_with || []).forEach(targetName => {
+        const tgts = groupAgents[targetName] || []
+        if (!tgts.length) return
+        const n = Math.min(srcs.length, 5)
+        for (let i = 0; i < n; i++) {
+          addEdge(srcs[i], tgts[i % tgts.length], `${group.name} → ${targetName}`)
+        }
+      })
+    })
+
+    try {
+      const relRes = await getSimulationRelationships(simulationId.value)
+      const aiEdges = relRes.data?.edges || []
+      aiEdges.forEach(e => { addEdge(e.src_id, e.tgt_id, e.type, e.label) })
+      addLog(`AI relationships: ${aiEdges.length} edges`)
+    } catch (err) {
+      addLog(`AI relationships skipped: ${err.message}`)
+    }
+
+    graphData.value = { nodes, edges }
+    addLog(`Agent graph: ${nodes.length} nodes, ${edges.length} edges`)
+  } catch (err) {
+    addLog(`Agent graph build failed: ${err.message}`)
+  } finally {
+    graphLoading.value = false
   }
 }
 

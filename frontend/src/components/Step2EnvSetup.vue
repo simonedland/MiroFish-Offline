@@ -20,7 +20,32 @@
             Create new simulation instance and fetch simulated world parameter template
           </p>
 
-          <div v-if="simulationId" class="info-card">
+          <!-- Advanced Config — shown before preparation starts -->
+          <div v-if="!preparationStarted" class="adv-config-panel">
+            <div class="adv-config-row">
+              <div class="adv-config-item">
+                <label class="adv-label">Agents per Batch</label>
+                <p class="adv-desc">LLM calls group agents into batches for config generation. Larger batch = fewer API calls but more tokens per call.</p>
+                <div class="adv-input-row">
+                  <input
+                    type="number"
+                    v-model.number="agentsPerBatch"
+                    min="5"
+                    max="50"
+                    step="5"
+                    class="adv-number-input"
+                  />
+                  <span class="adv-unit">agents / batch</span>
+                  <button class="adv-reset-btn" @click="agentsPerBatch = 15">Reset</button>
+                </div>
+              </div>
+            </div>
+            <button class="start-prep-btn" @click="beginPreparation">
+              ▶ Start Preparation
+            </button>
+          </div>
+
+          <div v-if="simulationId && preparationStarted" class="info-card">
             <div class="info-row">
               <span class="info-label">Project ID</span>
               <span class="info-value mono">{{ projectData?.project_id }}</span>
@@ -36,6 +61,10 @@
             <div class="info-row">
               <span class="info-label">Task ID</span>
               <span class="info-value mono">{{ taskId || 'Async task completed' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Agents per Batch</span>
+              <span class="info-value mono">{{ agentsPerBatch }}</span>
             </div>
           </div>
         </div>
@@ -672,6 +701,10 @@ let lastLoggedConfigStage = ''
 const useCustomRounds = ref(false) // DefaultUse auto-configured rounds
 const customMaxRounds = ref(40)   // Default recommendation40rounds
 
+// Batch size configuration
+const agentsPerBatch = ref(15)
+const preparationStarted = ref(false)
+
 // Watch stage to update phase
 watch(currentStage, (newStage) => {
   if (newStage === 'GenerateAgentPersona' || newStage === 'generating_profiles') {
@@ -765,6 +798,13 @@ const selectProfile = (profile) => {
   selectedProfile.value = profile
 }
 
+// Called when user clicks "Start Preparation" button
+const beginPreparation = () => {
+  preparationStarted.value = true
+  addLog(`Agents per batch: ${agentsPerBatch.value}`)
+  startPrepareSimulation()
+}
+
 // Automatically start preparing simulation
 const startPrepareSimulation = async () => {
   if (!props.simulationId) {
@@ -783,7 +823,8 @@ const startPrepareSimulation = async () => {
     const res = await prepareSimulation({
       simulation_id: props.simulationId,
       use_llm_for_profiles: true,
-      parallel_profile_count: 5
+      parallel_profile_count: agentsPerBatch.value,
+      agents_per_batch: agentsPerBatch.value
     })
     
     if (res.success && res.data) {
@@ -1066,10 +1107,9 @@ watch(() => props.systemLogs?.length, () => {
 })
 
 onMounted(() => {
-  // Automatically start preparation process
   if (props.simulationId) {
     addLog('Step2 Env Setup Initialization')
-    startPrepareSimulation()
+    addLog('Configure batch size and click "Start Preparation" to begin')
   }
 })
 
@@ -2046,6 +2086,109 @@ onUnmounted(() => {
   line-height: 1.8;
   margin: 0;
   text-align: justify;
+}
+
+/* Advanced Config Panel */
+.adv-config-panel {
+  margin-top: 16px;
+  background: #F9F9F9;
+  border: 1px solid #E5E5E5;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.adv-config-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.adv-config-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.adv-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.adv-desc {
+  font-size: 11px;
+  color: #888;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.adv-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adv-number-input {
+  width: 72px;
+  padding: 6px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid #CCC;
+  border-radius: 6px;
+  background: #FFF;
+  color: #000;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.adv-number-input:focus {
+  border-color: #FF5722;
+}
+
+.adv-unit {
+  font-size: 12px;
+  color: #666;
+}
+
+.adv-reset-btn {
+  font-size: 11px;
+  color: #999;
+  background: none;
+  border: 1px solid #DDD;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.adv-reset-btn:hover {
+  color: #333;
+  border-color: #999;
+}
+
+.start-prep-btn {
+  width: 100%;
+  padding: 12px;
+  background: #000;
+  color: #FFF;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: opacity 0.2s;
+}
+
+.start-prep-btn:hover {
+  opacity: 0.8;
 }
 
 /* System Logs */

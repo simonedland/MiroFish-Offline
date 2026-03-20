@@ -80,11 +80,19 @@
                 <span :style="[s.pastStatus, { color: simStatusColor(sim.status) }]">{{ sim.status }}</span>
                 <span :style="s.pastAge">{{ simAge(sim.created_at) }}</span>
                 <button
-                  :style="s.deleteBtn"
+                  :style="[s.deleteBtn, deletingId === sim.simulation_id ? s.deleteBtnSpinning : (hoveredDeleteId === sim.simulation_id ? s.deleteBtnHover : null)]"
                   :disabled="deletingId === sim.simulation_id"
                   @click="removeSimulation(sim, $event)"
+                  @mouseenter="hoveredDeleteId = sim.simulation_id"
+                  @mouseleave="hoveredDeleteId = null"
                   title="Delete simulation"
-                >{{ deletingId === sim.simulation_id ? '…' : '×' }}</button>
+                >
+                  <svg v-if="deletingId !== sim.simulation_id" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                  <span v-else style="font-size:11px;line-height:1">···</span>
+                </button>
               </div>
             </div>
           </div>
@@ -163,6 +171,7 @@ const generating = ref(false)
 const errorMsg = ref('')
 const pastSimulations = ref([])
 const deletingId = ref(null)
+const hoveredDeleteId = ref(null)
 
 // ── Content ────────────────────────────────────────────────────────────────
 const placeholder = `Example:
@@ -564,13 +573,27 @@ const s = {
   },
   deleteBtn: {
     background: 'transparent',
-    border: 'none',
-    color: '#444',
-    fontSize: '16px',
+    border: '1px solid transparent',
+    color: '#3a3a3a',
+    width: '26px',
+    height: '26px',
+    borderRadius: '5px',
     cursor: 'pointer',
-    padding: '0 0 0 6px',
-    lineHeight: '1',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0',
     flexShrink: '0',
+  },
+  deleteBtnHover: {
+    background: 'rgba(220, 50, 50, 0.1)',
+    borderColor: 'rgba(220, 50, 50, 0.25)',
+    color: '#e05252',
+  },
+  deleteBtnSpinning: {
+    opacity: '0.4',
+    cursor: 'default',
+    color: '#444',
   },
 
   // ── Progress phase ──

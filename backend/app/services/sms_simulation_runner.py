@@ -98,11 +98,13 @@ class SmsSimulationRunner:
         profiles: list,
         relationships: dict,
         config: dict,
+        round_callback=None,
     ) -> None:
         self.simulation_id = simulation_id
         self.profiles = profiles
         self.relationships = relationships  # raw relationships_ai.json dict
         self.total_rounds: int = int(config.get("total_rounds", 10))
+        self._round_callback = round_callback  # called with (round_num) after each round
 
         # Build phone → profile lookup
         self._phone_to_profile: dict = {p.phone_number: p for p in profiles if p.phone_number}
@@ -136,6 +138,11 @@ class SmsSimulationRunner:
                     break
                 logger.info("Starting round %d/%d", round_num, self.total_rounds)
                 await self._run_round(round_num)
+                if self._round_callback:
+                    try:
+                        self._round_callback(round_num)
+                    except Exception:
+                        pass
         finally:
             await self._llm_client.close()
 
@@ -206,8 +213,8 @@ class SmsSimulationRunner:
         active_pairs = []
 
         for edge in edges:
-            source_id = edge.get("src_id") or edge.get("source") or edge.get("source_id")
-            target_id = edge.get("tgt_id") or edge.get("target") or edge.get("target_id")
+            source_id = next((edge[k] for k in ("src_id", "source", "source_id") if k in edge and edge[k] is not None), None)
+            target_id = next((edge[k] for k in ("tgt_id", "target", "target_id") if k in edge and edge[k] is not None), None)
             rel_type = (edge.get("type") or edge.get("relationship_type") or "").upper()
 
             profile_a = self._resolve_profile(source_id)
@@ -349,8 +356,8 @@ class SmsSimulationRunner:
     def _get_relationship(self, id_a: int, id_b: int) -> dict:
         """Return the edge dict between two agents (either direction), or {}."""
         for edge in self._extract_edges():
-            src = edge.get("src_id") or edge.get("source") or edge.get("source_id")
-            tgt = edge.get("tgt_id") or edge.get("target") or edge.get("target_id")
+            src = next((edge[k] for k in ("src_id", "source", "source_id") if k in edge and edge[k] is not None), None)
+            tgt = next((edge[k] for k in ("tgt_id", "target", "target_id") if k in edge and edge[k] is not None), None)
             try:
                 src, tgt = int(src), int(tgt)
             except (TypeError, ValueError):
@@ -363,8 +370,8 @@ class SmsSimulationRunner:
         # Collect contacts with relationship type and label
         contact_lines = []
         for edge in self._extract_edges():
-            source_id = edge.get("src_id") or edge.get("source") or edge.get("source_id")
-            target_id = edge.get("tgt_id") or edge.get("target") or edge.get("target_id")
+            source_id = next((edge[k] for k in ("src_id", "source", "source_id") if k in edge and edge[k] is not None), None)
+            target_id = next((edge[k] for k in ("tgt_id", "target", "target_id") if k in edge and edge[k] is not None), None)
             rel_type = (edge.get("type") or edge.get("relationship_type") or "KNOWS").upper()
             label = edge.get("label", "")
 

@@ -1,0 +1,228 @@
+<h2>Live SMS Activity — Animation Approaches</h2>
+<p class="subtitle">When an SMS is sent between two agents, the graph connection reacts. Pick the style that feels right.</p>
+
+<style>
+  .demo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin: 24px 0;
+  }
+  .demo-card {
+    background: #13131f;
+    border: 2px solid #2e2e42;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .demo-card:hover {
+    border-color: #7B2D8E;
+    transform: translateY(-2px);
+  }
+  .demo-card.selected {
+    border-color: #E91E63;
+    box-shadow: 0 0 20px rgba(233, 30, 99, 0.25);
+  }
+  .demo-label {
+    padding: 12px 16px 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge {
+    background: #2e2e42;
+    color: #888;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+  }
+  .demo-canvas {
+    display: block;
+    width: 100%;
+    background: #13131f;
+    background-image: radial-gradient(#2a2a3e 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+  .demo-desc {
+    padding: 10px 16px 14px;
+    font-size: 11px;
+    color: #888;
+    line-height: 1.5;
+    border-top: 1px solid #2e2e42;
+    background: #0f0f1a;
+  }
+  .demo-desc strong {
+    color: #ccc;
+    display: block;
+    margin-bottom: 3px;
+    font-size: 12px;
+  }
+
+  /* ── Approach A: Edge Blink ─────────────────────────────── */
+  @keyframes edgeBlink {
+    0%, 100% { stroke: #2e2e42; stroke-width: 1.5; filter: none; }
+    15%       { stroke: #ff9f4a; stroke-width: 4;   filter: drop-shadow(0 0 6px #ff9f4a); }
+    35%       { stroke: #ff9f4a; stroke-width: 3.5; filter: drop-shadow(0 0 4px #ff9f4a); }
+    55%       { stroke: #ff6b35; stroke-width: 2;   filter: drop-shadow(0 0 2px #ff6b35); }
+    70%       { stroke: #2e2e42; stroke-width: 1.5; filter: none; }
+  }
+  .edge-blink {
+    animation: edgeBlink 2.5s ease-in-out infinite;
+  }
+
+  /* ── Approach B: Traveling Dot ──────────────────────────── */
+  @keyframes dotTravel {
+    0%   { offset-distance: 0%;   opacity: 0; }
+    5%   { opacity: 1; }
+    95%  { opacity: 1; }
+    100% { offset-distance: 100%; opacity: 0; }
+  }
+  .travel-dot {
+    offset-path: path("M 40,130 Q 140,30 240,130");
+    animation: dotTravel 1.8s ease-in-out infinite;
+    animation-delay: 0.3s;
+  }
+  @keyframes nodePulseB {
+    0%,100% { r: 10; }
+    20%     { r: 17; }
+    40%     { r: 10; }
+  }
+  .pulse-src { animation: nodePulseB 1.8s ease-in-out infinite; }
+  @keyframes nodePulseBtgt {
+    0%,75%  { r: 10; }
+    85%     { r: 15; }
+    100%    { r: 10; }
+  }
+  .pulse-tgt { animation: nodePulseBtgt 1.8s ease-in-out infinite; }
+
+  /* ── Approach C: Glow Edge + Dot ────────────────────────── */
+  @keyframes edgeGlow {
+    0%, 100% { stroke: #2e2e42; stroke-width: 1.5; opacity: 0.6; }
+    10%      { stroke: #a855f7; stroke-width: 3;   opacity: 1; filter: drop-shadow(0 0 8px #a855f7); }
+    50%      { stroke: #7B2D8E; stroke-width: 2.5; opacity: 0.9; filter: drop-shadow(0 0 4px #7B2D8E); }
+    80%      { stroke: #2e2e42; stroke-width: 1.5; opacity: 0.6; }
+  }
+  .edge-glow { animation: edgeGlow 2.2s ease-in-out infinite; }
+
+  @keyframes dotTravelC {
+    0%   { offset-distance: 0%;   opacity: 0; }
+    5%   { opacity: 1; }
+    95%  { opacity: 1; }
+    100% { offset-distance: 100%; opacity: 0; }
+  }
+  .travel-dot-c {
+    offset-path: path("M 40,130 Q 140,30 240,130");
+    animation: dotTravelC 2.2s ease-in-out infinite;
+    animation-delay: 0.1s;
+  }
+  @keyframes nodeGlowC {
+    0%,100% { filter: none; r: 10; }
+    12%     { filter: drop-shadow(0 0 8px #a855f7); r: 14; }
+    30%     { filter: drop-shadow(0 0 4px #7B2D8E); r: 11; }
+    50%     { filter: none; r: 10; }
+  }
+  .glow-src { animation: nodeGlowC 2.2s ease-in-out infinite; }
+  @keyframes nodeGlowCtgt {
+    0%,80%  { filter: none; r: 10; }
+    90%     { filter: drop-shadow(0 0 8px #a855f7); r: 14; }
+    100%    { filter: none; r: 10; }
+  }
+  .glow-tgt { animation: nodeGlowCtgt 2.2s ease-in-out infinite; }
+</style>
+
+<div class="demo-grid">
+
+  <!-- Approach A -->
+  <div class="demo-card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="demo-label">
+      <div class="letter" style="width:24px;height:24px;min-width:24px;font-size:12px">A</div>
+      Edge Blink
+      <span class="badge">SIMPLE</span>
+    </div>
+    <svg class="demo-canvas" viewBox="0 0 280 200" height="160">
+      <!-- static edges -->
+      <path d="M 40,130 Q 140,170 240,130" stroke="#2e2e42" stroke-width="1.5" fill="none" opacity="0.4"/>
+      <!-- animated blink edge -->
+      <path class="edge-blink" d="M 40,130 Q 140,30 240,130" fill="none"/>
+      <!-- nodes -->
+      <circle cx="40" cy="130" r="10" fill="#FF6B35" stroke="#1a1a2e" stroke-width="2.5"/>
+      <circle cx="240" cy="130" r="10" fill="#004E89" stroke="#1a1a2e" stroke-width="2.5"/>
+      <text x="40" y="150" font-size="9" fill="#888" text-anchor="middle" font-family="system-ui">Alice</text>
+      <text x="240" y="150" font-size="9" fill="#888" text-anchor="middle" font-family="system-ui">Bob</text>
+      <!-- SMS icon on edge -->
+      <text x="140" y="52" font-size="11" fill="#ff9f4a" text-anchor="middle" font-family="system-ui" opacity="0.9">✉</text>
+    </svg>
+    <div class="demo-desc">
+      <strong>The connection flashes bright on send</strong>
+      The edge pulses with a warm glow when an SMS is sent, then fades back. Clean and immediate — attention goes straight to the link.
+    </div>
+  </div>
+
+  <!-- Approach B -->
+  <div class="demo-card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="demo-label">
+      <div class="letter" style="width:24px;height:24px;min-width:24px;font-size:12px">B</div>
+      Traveling Dot
+      <span class="badge">DIRECTIONAL</span>
+    </div>
+    <svg class="demo-canvas" viewBox="0 0 280 200" height="160">
+      <defs>
+        <path id="pathB" d="M 40,130 Q 140,30 240,130"/>
+      </defs>
+      <!-- static edges -->
+      <path d="M 40,130 Q 140,170 240,130" stroke="#2e2e42" stroke-width="1.5" fill="none" opacity="0.4"/>
+      <path d="M 40,130 Q 140,30 240,130" stroke="#2e2e42" stroke-width="1.5" fill="none"/>
+      <!-- traveling dot -->
+      <circle class="travel-dot" r="5" fill="#ff9f4a" opacity="0.9"/>
+      <!-- nodes with pulse -->
+      <circle class="pulse-src" cx="40" cy="130" fill="#FF6B35" stroke="#1a1a2e" stroke-width="2.5"/>
+      <circle class="pulse-tgt" cx="240" cy="130" fill="#004E89" stroke="#1a1a2e" stroke-width="2.5"/>
+      <text x="40" y="150" font-size="9" fill="#888" text-anchor="middle" font-family="system-ui">Alice</text>
+      <text x="240" y="150" font-size="9" fill="#888" text-anchor="middle" font-family="system-ui">Bob</text>
+    </svg>
+    <div class="demo-desc">
+      <strong>A dot travels from sender to receiver</strong>
+      Shows direction clearly — you see who's sending to whom. Nodes pulse on send and receive. Extends the existing animation system.
+    </div>
+  </div>
+
+  <!-- Approach C -->
+  <div class="demo-card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="demo-label">
+      <div class="letter" style="width:24px;height:24px;min-width:24px;font-size:12px">C</div>
+      Glow + Dot
+      <span class="badge">RICH</span>
+    </div>
+    <svg class="demo-canvas" viewBox="0 0 280 200" height="160">
+      <!-- static edges -->
+      <path d="M 40,130 Q 140,170 240,130" stroke="#2e2e42" stroke-width="1.5" fill="none" opacity="0.4"/>
+      <!-- glowing edge -->
+      <path class="edge-glow" d="M 40,130 Q 140,30 240,130" fill="none"/>
+      <!-- traveling dot -->
+      <circle class="travel-dot-c" r="5" fill="#a855f7" opacity="0.95"/>
+      <!-- nodes with glow -->
+      <circle class="glow-src" cx="40" cy="130" fill="#FF6B35" stroke="#1a1a2e" stroke-width="2.5"/>
+      <circle class="glow-tgt" cx="240" cy="130" fill="#004E89" stroke="#1a1a2e" stroke-width="2.5"/>
+      <text x="40" y="150" font-size="9" fill="#888" text-anchor="middle" font-family="system-ui">Alice</text>
+      <text x="240" y="150" font-size="9" fill="#888" text-anchor="middle" font-family="system-ui">Bob</text>
+    </svg>
+    <div class="demo-desc">
+      <strong>Edge glows purple + dot travels</strong>
+      A distinct purple color (different from existing orange Reddit actions) marks SMS activity with both an edge glow and a traveling particle.
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="background:#0f0f1a;border:1px solid #2e2e42;border-radius:8px;padding:14px 18px;margin-top:8px;">
+  <div class="label" style="color:#E91E63;margin-bottom:8px;">Note: All approaches also need</div>
+  <p style="margin:0;font-size:12px;color:#888;line-height:1.6">
+    Wiring the SMS event poll (<code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;color:#ccc">getSmsEvents</code>) into <code style="background:#1a1a2e;padding:1px 5px;border-radius:3px;color:#ccc">SimulationRunView</code> — the animation is only the visual part. The plumbing is the same regardless of which style you pick.
+  </p>
+</div>

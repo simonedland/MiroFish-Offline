@@ -560,7 +560,9 @@ const renderGraph = () => {
       rawData: {
         ...e,
         source_name: nodeMap[e.source_node_uuid]?.name,
-        target_name: nodeMap[e.target_node_uuid]?.name
+        target_name: nodeMap[e.target_node_uuid]?.name,
+        fact_type: e.fact_type || e.relationship_type || e.type || null,
+        uuid: e.uuid || e.id || null,
       }
     })
   })

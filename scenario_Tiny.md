@@ -38,6 +38,6 @@ Barely active during the day, then highly active in the evening. Messages are ab
 
 Routine-driven and upbeat. Messages about workouts, step counts, class times, meal prep, recovery, and whether someone is joining the gym session. Fairly consistent rhythm, with activity tending to stop early at night.
 
-10. The Outlier/bad actor
+10. The Bad Actor
 
 At first glance, seems ordinary enough. Friendly tone, short check-ins, occasional practical messages. But over time, their pattern stands out. They contact a narrower set of people, often at specific times, and their wording is more indirect than everyone else’s. They avoid detail, rarely explain context, and their message timing feels more deliberate than spontaneous. Nothing obvious on its own — just enough to feel slightly off when viewed as part of the whole network.

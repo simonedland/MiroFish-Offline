@@ -56,6 +56,7 @@ class DescriptionConfigGenerator:
         enable_twitter: bool = True,
         enable_reddit: bool = True,
         progress_callback: Optional[Callable[[int, int], None]] = None,
+        agents_per_batch: int = 15,
     ) -> SimulationParameters:
         """
         Build complete SimulationParameters from a ScenarioDefinition.
@@ -79,7 +80,7 @@ class DescriptionConfigGenerator:
         time_config = self._build_time_config(scenario)
 
         # 2. Per-agent activity configs from groups
-        agent_configs = self._build_agent_configs(scenario, profiles, progress_callback)
+        agent_configs = self._build_agent_configs(scenario, profiles, progress_callback, agents_per_batch)
 
         # 3. Event config via LLM
         event_config = self._build_event_config(scenario, agent_configs)
@@ -153,6 +154,7 @@ class DescriptionConfigGenerator:
         scenario: ScenarioDefinition,
         profiles: List[OasisAgentProfile],
         progress_callback: Optional[Callable[[int, int], None]] = None,
+        agents_per_batch: int = 15,
     ) -> List[AgentActivityConfig]:
         """
         Generate one AgentActivityConfig per agent via batched LLM calls.
@@ -167,11 +169,11 @@ class DescriptionConfigGenerator:
         group_map: Dict[str, AgentGroup] = {g.name: g for g in scenario.groups}
         all_configs: List[AgentActivityConfig] = []
 
-        num_batches = math.ceil(len(profiles) / self.AGENTS_PER_BATCH)
+        num_batches = math.ceil(len(profiles) / agents_per_batch)
 
         for batch_idx in range(num_batches):
-            start = batch_idx * self.AGENTS_PER_BATCH
-            end = min(start + self.AGENTS_PER_BATCH, len(profiles))
+            start = batch_idx * agents_per_batch
+            end = min(start + agents_per_batch, len(profiles))
             batch = profiles[start:end]
 
             logger.info(

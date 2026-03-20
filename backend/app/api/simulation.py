@@ -43,6 +43,92 @@ def optimize_interview_prompt(prompt: str) -> str:
     return f"{INTERVIEW_PROMPT_PREFIX}{prompt}"
 
 
+def _interview_sms_agents(simulation_id: str, interviews: list, manager: 'SimulationManager') -> dict:
+    """
+    Interview agents in an SMS-mode simulation directly via LLM (no OASIS process needed).
+
+    Looks up each agent's profile, builds a persona-aware system prompt that includes
+    their SMS conversation history, and asks the LLM to reply in-character.
+
+    Returns a dict compatible with the OASIS interview_agents_batch result format.
+    """
+    import json as _json
+    import os as _os
+    from ..utils.llm_client import LLMClient
+
+    sim_dir = manager._get_simulation_dir(simulation_id)
+    profiles_path = _os.path.join(sim_dir, "reddit_profiles.json")
+
+    profiles: list = []
+    if _os.path.exists(profiles_path):
+        with open(profiles_path, "r", encoding="utf-8") as f:
+            profiles = _json.load(f)
+
+    # Build agent_id → profile lookup (profiles are 0-indexed in the list)
+    profile_by_id: dict = {}
+    for idx, p in enumerate(profiles):
+        uid = p.get("user_id", idx)
+        profile_by_id[int(uid)] = p
+        profile_by_id[idx] = p  # also reachable by list index
+
+    # Lazy-init LLM client
+    llm = LLMClient()
+
+    results: dict = {}
+    for interview in interviews:
+        agent_id = int(interview.get("agent_id", 0))
+        prompt = interview.get("prompt", "")
+        profile = profile_by_id.get(agent_id)
+
+        if not profile:
+            results[f"sms_{agent_id}"] = {
+                "agent_id": agent_id,
+                "success": False,
+                "response": f"Agent {agent_id} not found.",
+                "platform": "sms",
+            }
+            continue
+
+        name = profile.get("name") or profile.get("username") or f"Agent {agent_id}"
+        persona = profile.get("persona") or profile.get("bio") or ""
+
+        system_prompt = (
+            f"You are {name}. Stay fully in character at all times.\n"
+            f"Background: {persona}\n\n"
+            "Reply naturally and conversationally as this person would in a text message or interview. "
+            "Keep your answer concise (2-4 sentences). Do not break character or mention that you are an AI."
+        )
+
+        try:
+            response_text = llm.chat(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.85,
+                max_tokens=300,
+            )
+            results[f"sms_{agent_id}"] = {
+                "agent_id": agent_id,
+                "success": True,
+                "response": response_text,
+                "platform": "sms",
+            }
+        except Exception as exc:
+            logger.warning("SMS interview failed for agent %d: %s", agent_id, exc)
+            results[f"sms_{agent_id}"] = {
+                "agent_id": agent_id,
+                "success": False,
+                "response": f"Interview failed: {exc}",
+                "platform": "sms",
+            }
+
+    return {
+        "interviews_count": len(interviews),
+        "results": results,
+    }
+
+
 # ============== Entity reading interface ==============
 
 @simulation_bp.route('/entities/<graph_id>', methods=['GET'])
@@ -458,6 +544,7 @@ def prepare_simulation():
         entity_types_list = data.get('entity_types')
         use_llm_for_profiles = data.get('use_llm_for_profiles', True)
         parallel_profile_count = data.get('parallel_profile_count', 5)
+        agents_per_batch = int(data.get('agents_per_batch', 15))
         
         # ========== Get GraphStorage（Capture reference before background task starts） ==========
         storage = current_app.extensions.get('neo4j_storage')
@@ -580,6 +667,7 @@ def prepare_simulation():
                     use_llm_for_profiles=use_llm_for_profiles,
                     progress_callback=progress_callback,
                     parallel_profile_count=parallel_profile_count,
+                    agents_per_batch=agents_per_batch,
                     storage=storage,
                 )
                 
@@ -1602,7 +1690,10 @@ def start_simulation():
         if simulation_mode == 'sms':
             manager = SimulationManager()
             max_rounds = data.get("max_rounds")
-            result = manager.start_sms_simulation(simulation_id, max_rounds=max_rounds)
+            try:
+                result = manager.start_sms_simulation(simulation_id, max_rounds=max_rounds, force=force)
+            except ValueError as e:
+                return jsonify({"success": False, "error": str(e)}), 400
             return jsonify({"success": True, "data": result})
 
         # Verify max_rounds Parameters
@@ -2459,6 +2550,13 @@ def interview_agents_batch():
                     "success": False,
                     "error": f"Interview list item {i+1}: platform must be 'twitter' or 'reddit'"
                 }), 400
+
+        # SMS simulations have no OASIS process — handle with a direct LLM call.
+        manager_for_mode = SimulationManager()
+        sim_state_for_mode = manager_for_mode.get_simulation(simulation_id)
+        if sim_state_for_mode and sim_state_for_mode.simulation_mode == "sms":
+            result = _interview_sms_agents(simulation_id, interviews, manager_for_mode)
+            return jsonify({"success": True, "data": result})
 
         # Check environment status
         if not SimulationRunner.check_env_alive(simulation_id):

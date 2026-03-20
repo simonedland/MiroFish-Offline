@@ -460,7 +460,7 @@ class Neo4jStorage(GraphStorage):
                 """
                 MATCH (src:Entity)-[r:RELATION {graph_id: $gid}]->(tgt:Entity)
                 RETURN r, src.uuid AS src_uuid, tgt.uuid AS tgt_uuid
-                ORDER BY r.created_at DESC
+                ORDER BY coalesce(r.created_at, 0) DESC
                 """,
                 gid=graph_id,
             )

@@ -713,11 +713,26 @@ watch(() => props.systemLogs?.length, () => {
   })
 })
 
-onMounted(() => {
+onMounted(async () => {
   addLog('Step3 Simulation initialization')
-  if (props.simulationId) {
-    doStartSimulation()
+  if (!props.simulationId) return
+
+  // Check if simulation is already running before attempting a (re)start
+  try {
+    const statusRes = await getRunStatus(props.simulationId)
+    if (statusRes.success && statusRes.data?.runner_status === 'running') {
+      addLog('Resuming existing simulation...')
+      phase.value = 1
+      runStatus.value = statusRes.data
+      startStatusPolling()
+      startDetailPolling()
+      return
+    }
+  } catch (_e) {
+    // Ignore status check errors and proceed to start
   }
+
+  doStartSimulation()
 })
 
 onUnmounted(() => {
